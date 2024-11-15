@@ -1,0 +1,36 @@
+Technical Exercise to be completed at home:
+
+Create an accounting system to manage pending and settled transactions.
+
+This exercise will test your ability to implement a simple accounting system
+that tracks pending and settled transactions.
+
+Pending transactions reduce the available balance but are treated differently
+from settled transactions.  While a particular transaction is pending, a
+partial or full refund can be applied, which reduces the amount of funds
+pending.
+
+For this exercise, build a CLI system that allows for the following:
+- Creating an account
+- Creating a pending transaction
+- Settling a pending transaction
+- Refunding part or all of a pending transaction
+- Calculating the available balance (settled + pending)
+- Listing all transactions for an account
+
+BONUS:
+- guard against double spending
+- guard against over spending
+
+We recommend researching similar systems before starting to code. How have
+others implemented accounting ledger systems? Are there good practices around
+modeling pending transactions? How should you model debit vs. credit
+transactions and the direction of money? Should you decide to have one ledger
+or many?
+
+You are free to use any technology and programming language of your choice.
+The purpose of this exercise is to help us determine if you are the right
+candidate for this role.
+
+** Each sentence and requirement has a meaning, so it is important to make sure
+every requirement is being read and actioned **
