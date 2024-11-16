@@ -1,10 +1,10 @@
-import sqlite3
+import sqlalchemy
+from sqlalchemy import create_engine, text
 
 
 def connect():
-    return sqlite3.connect("accounting.db")
+    return create_engine("sqlite:///accounting.db")
 
 
-def create_tables(db: sqlite3.Connection):
-    cur = db.cursor()
-    cur.execute("CREATE TABLE IF NOT EXISTS account (account_id, name)")
+def create_tables(conn: sqlalchemy.Connection):
+    conn.execute(text("CREATE TABLE IF NOT EXISTS account (id PRIMARY KEY, name)"))
