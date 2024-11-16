@@ -27,7 +27,8 @@ class AutocommitSessionTransaction:
         return self.session.begin()
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        self.session.commit()
+        if exc_type is None:
+            self.session.commit()
         self.session.__exit__(exc_type, exc_val, exc_tb)
 
 

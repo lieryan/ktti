@@ -13,7 +13,7 @@ class Account(Base):
     __tablename__ = "account"
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
-    name: Mapped[str] = mapped_column(String(30))
+    name: Mapped[str] = mapped_column(String(30), unique=True)
 
 
 def connect():
