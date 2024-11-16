@@ -1,10 +1,12 @@
 from decimal import Decimal
 from typing import Optional, NewType
+from uuid import uuid4, UUID
+from db import Account
 
 from sqlalchemy.orm import Session
 
 
-AccountId = NewType("AccountId", str)
+AccountId = NewType("AccountId", UUID)
 TransactionId = NewType("TransactionId", str)
 Money = NewType("Money", Decimal)
 
@@ -31,7 +33,11 @@ class Ledger:
         self,
         name: str,
     ) -> AccountId:
-        return AccountId("")
+        obj = Account(name=name)
+        with self as session_transaction:
+            self.session.add(obj)
+            self.session.flush()
+            return AccountId(obj.id)
 
 
     def get_or_create_account(

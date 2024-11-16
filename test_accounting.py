@@ -1,9 +1,11 @@
 import sqlalchemy
-from sqlalchemy import create_engine, text
+from uuid import UUID
+from sqlalchemy import create_engine, text, select
+from sqlalchemy.orm import Session
 
 from pytest import fixture
 
-from db import create_tables
+from db import create_tables, Account
 import accounting
 
 
@@ -16,6 +18,11 @@ def engine():
 def conn(engine):
     with engine.begin() as conn:
         yield conn
+
+
+@fixture
+def ledger(engine):
+    return accounting.Ledger(engine)
 
 
 @fixture
@@ -42,6 +49,9 @@ def test_create_tables(conn):
     assert table_exists(conn, "account")
 
 
-def test_create_account(db):
-    ledger = accounting.Ledger(db)
-    ledger.create_account("hello")
+def test_create_account(ledger, db):
+    ledger.create_account("andy")
+
+    account = ledger.session.execute(select(Account)).scalar()
+    assert isinstance(account.id, UUID)
+    assert account.name == "andy"
