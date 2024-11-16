@@ -14,9 +14,6 @@ class Transaction:
     pass
 
 
-## API
-
-
 class AutocommitSessionTransaction:
     """
     A mixin class that handles dealing opening and automatically committing
@@ -30,6 +27,9 @@ class AutocommitSessionTransaction:
         if exc_type is None:
             self.session.commit()
         self.session.__exit__(exc_type, exc_val, exc_tb)
+
+
+## API
 
 
 class Ledger(AutocommitSessionTransaction):
@@ -46,13 +46,6 @@ class Ledger(AutocommitSessionTransaction):
             self.session.add(obj)
             self.session.flush()
             return AccountId(obj.id)
-
-
-    def get_or_create_account(
-        self,
-        name: str,
-    ) -> AccountId:
-        return AccountId("")
 
 
     def create_pending_transaction(
