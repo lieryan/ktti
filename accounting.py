@@ -1,5 +1,7 @@
-from typing import Optional, NewType
 from decimal import Decimal
+from typing import Optional, NewType
+
+from sqlalchemy.orm import Session
 
 
 AccountId = NewType("AccountId", str)
@@ -14,8 +16,16 @@ class Transaction:
 
 
 class Ledger:
-    def __init__(self, connection):
-        self.connection = connection
+    def __init__(self, engine):
+        self.engine = engine
+        self.session = Session(self.engine)
+
+    def __enter__(self):
+        return self.session.begin()
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.session.commit()
+        self.session.__exit__(exc_type, exc_val, exc_tb)
 
     def create_account(
         self,
