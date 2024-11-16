@@ -1,13 +1,14 @@
 from decimal import Decimal
 from typing import Optional, NewType
-from uuid import uuid4, UUID
-from db import Account
+from uuid import UUID
 
 from sqlalchemy.orm import Session
 
+from db import Account, Tx, TxType
+
 
 AccountId = NewType("AccountId", UUID)
-TransactionId = NewType("TransactionId", str)
+TransactionId = NewType("TransactionId", UUID)
 Money = NewType("Money", Decimal)
 
 class Transaction:
@@ -44,7 +45,7 @@ class Ledger(AutocommitSessionTransaction):
         name: str,
     ) -> AccountId:
         obj = Account(name=name)
-        with self as session_transaction:
+        with self:
             self.session.add(obj)
             self.session.flush()
             return AccountId(obj.id)
@@ -55,10 +56,18 @@ class Ledger(AutocommitSessionTransaction):
         tx_id: TransactionId,
         account_id: AccountId,
         amount: Money,
-        last_tx_id: Optional[TransactionId],
+        last_tx_id: Optional[TransactionId] = None,
     ):
-        pass
-
+        obj = Tx(
+            id=tx_id,
+            account_id=account_id,
+            type=TxType.PENDING,
+            amount=amount,
+        )
+        with self:
+            self.session.add(obj)
+            self.session.flush()
+            return TransactionId(obj.id)
 
     def settle_pending_transaction(
         self,
@@ -103,7 +112,7 @@ class Ledger(AutocommitSessionTransaction):
 
     ### UI
 
-    def print_transaction(
+    def print_transactions(
         self,
         account_id: AccountId,
     ) -> Transaction:

@@ -1,12 +1,13 @@
+from decimal import Decimal
+from uuid import UUID, uuid4
+
 import sqlalchemy
-from uuid import UUID
-from sqlalchemy import create_engine, text, select
-from sqlalchemy.orm import Session
-
 from pytest import fixture, raises
+from sqlalchemy import create_engine, text, select
 
-from db import create_tables, Account
 import accounting
+from accounting import Money
+from db import create_tables, Account, Tx, TxType
 
 
 @fixture
@@ -61,3 +62,18 @@ def test_cannot_create_two_accounts_with_the_same_name(ledger, db):
     ledger.create_account("andy")
     with raises(sqlalchemy.exc.IntegrityError):
         ledger.create_account("andy")
+
+
+def test_create_pending_transaction(ledger, db):
+    andy = ledger.create_account("andy")
+    transaction = ledger.create_pending_transaction(
+        tx_id=uuid4(),
+        account_id=andy,
+        amount=Money(Decimal("50")),
+    )
+
+    obj = ledger.session.execute(select(Tx)).scalar()
+    assert isinstance(obj.id, UUID)
+    assert obj.account.id == andy
+    assert obj.type == TxType.PENDING
+    assert obj.amount == Money(Decimal("50"))
