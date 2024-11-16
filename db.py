@@ -1,5 +1,7 @@
+from uuid import UUID
+
 import sqlalchemy
-from sqlalchemy import create_engine, text, String
+from sqlalchemy import create_engine, String
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -10,7 +12,7 @@ class Base(DeclarativeBase):
 class Account(Base):
     __tablename__ = "account"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
+    id: Mapped[UUID] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(30))
 
 
