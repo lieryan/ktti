@@ -1,5 +1,17 @@
 import sqlalchemy
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, text, String
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
+
+class Base(DeclarativeBase):
+    pass
+
+
+class Account(Base):
+    __tablename__ = "account"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(30))
 
 
 def connect():
@@ -7,4 +19,4 @@ def connect():
 
 
 def create_tables(conn: sqlalchemy.Connection):
-    conn.execute(text("CREATE TABLE IF NOT EXISTS account (id PRIMARY KEY, name)"))
+    Base.metadata.create_all(conn)
