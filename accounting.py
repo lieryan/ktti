@@ -17,17 +17,24 @@ class Transaction:
 ## API
 
 
-class Ledger:
-    def __init__(self, engine):
-        self.engine = engine
-        self.session = Session(self.engine)
-
+class AutocommitSessionTransaction:
+    """
+    A mixin class that handles dealing opening and automatically committing
+    database transaction when using an instance of the class as a context
+    manager.
+    """
     def __enter__(self):
         return self.session.begin()
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.session.commit()
         self.session.__exit__(exc_type, exc_val, exc_tb)
+
+
+class Ledger(AutocommitSessionTransaction):
+    def __init__(self, engine):
+        self.engine = engine
+        self.session = Session(self.engine)
 
     def create_account(
         self,
