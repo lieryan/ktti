@@ -2,3 +2,4 @@
 __pycache__
 *.db
 tags
+test-report.xml
