@@ -60,12 +60,14 @@ def test_create_account(ledger, db):
 
 def test_cannot_create_two_accounts_with_the_same_name(ledger, db):
     ledger.create_account("andy")
+
     with raises(sqlalchemy.exc.IntegrityError):
         ledger.create_account("andy")
 
 
 def test_create_pending_transaction(ledger, db):
     andy = ledger.create_account("andy")
+
     transaction = ledger.create_pending_transaction(
         tx_id=uuid4(),
         account_id=andy,
@@ -76,4 +78,24 @@ def test_create_pending_transaction(ledger, db):
     assert isinstance(obj.id, UUID)
     assert obj.account.id == andy
     assert obj.type == TxType.PENDING
+    assert obj.amount == Money(Decimal("50"))
+
+
+def test_settle_pending_transaction(ledger, db):
+    andy = ledger.create_account("andy")
+    pending_transaction = ledger.create_pending_transaction(
+        tx_id=uuid4(),
+        account_id=andy,
+        amount=Money(Decimal("50")),
+    )
+
+    settlement_transaction = ledger.settle_pending_transaction(
+        tx_id=uuid4(),
+        pending_tx_id=pending_transaction,
+    )
+
+    obj = ledger.session.execute(select(Tx).where(Tx.id == settlement_transaction)).scalar()
+    assert isinstance(obj.id, UUID)
+    assert obj.account.id == andy
+    assert obj.type == TxType.SETTLEMENT
     assert obj.amount == Money(Decimal("50"))

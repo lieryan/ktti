@@ -72,13 +72,24 @@ class Ledger(AutocommitSessionTransaction):
     def settle_pending_transaction(
         self,
         tx_id: TransactionId,
+        pending_tx_id: TransactionId,
     ):
         """
         Reflect the transaction amount to the current balance, if tx_id is already
         a settled transaction, do nothing.
         """
-        pass
-
+        with self:
+            pending_tx = self.session.get(Tx, pending_tx_id)
+            settled_amount = pending_tx.amount # TODO: calculate settled amount
+            obj = Tx(
+                id=tx_id,
+                account_id=pending_tx.account_id,
+                type=TxType.SETTLEMENT,
+                amount=settled_amount,
+            )
+            self.session.add(obj)
+            self.session.flush()
+            return TransactionId(obj.id)
 
     def refund_pending_transaction(
         self,
@@ -88,13 +99,11 @@ class Ledger(AutocommitSessionTransaction):
         """When `amount` is provided, do a partial refund."""
         pass
 
-
     def get_current_balance(
         self,
         account_id: AccountId,
     ) -> Money:
         return Money(Decimal())
-
 
     def get_available_balance(
         self,
@@ -102,13 +111,11 @@ class Ledger(AutocommitSessionTransaction):
     ) -> Money:
         return Money(Decimal())
 
-
     def list_transactions(
         self,
         account_id: AccountId,
     ) -> Transaction:
         return Transaction()
-
 
     ### UI
 

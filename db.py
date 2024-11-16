@@ -20,7 +20,7 @@ class Account(Base):
 
 class TxType(Enum):
     PENDING = "p"
-    SETTLED = "s"
+    SETTLEMENT = "s"
 
 
 class Tx(Base):
