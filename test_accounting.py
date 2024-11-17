@@ -33,7 +33,7 @@ def db(conn):
     return conn
 
 
-def table_exists(conn, tablename):
+def table_exists(conn, tablename: str) -> bool:
     try:
         conn.execute(text(f"SELECT * FROM {tablename}")).fetchall() == []
     except sqlalchemy.exc.OperationalError as e:

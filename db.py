@@ -18,7 +18,7 @@ class Account(Base):
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     name: Mapped[str] = mapped_column(String(30), unique=True)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return (
             f"<Account {self.id} name={self.name}>"
         )
@@ -44,7 +44,7 @@ class Tx(Base):
         tx_hash = sha256(data.encode("ascii")).digest()
         self.id = tx_hash
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return (
             f"<Tx {self.id} {self.type.name} account={self.account.name} amount={self.amount}>"
         )
@@ -54,5 +54,5 @@ def connect():
     return create_engine("sqlite:///accounting.db")
 
 
-def create_tables(conn: sqlalchemy.Connection):
+def create_tables(conn: sqlalchemy.Connection) -> None:
     Base.metadata.create_all(conn)
