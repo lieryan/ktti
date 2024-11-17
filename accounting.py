@@ -77,14 +77,14 @@ class Ledger(AutocommitSessionTransaction):
             self.session.flush()
             return TransactionId(obj.id)
 
-    def settle_pending_transaction(
+    def settle_transaction(
         self,
         idempotency_key: TransactionId,
         pending_tx_id: TransactionId,
     ):
         """
         Reflect the transaction amount to the current balance, if
-        idempotency_key is already a settled transaction, do nothing.
+        pending_tx_id is already a settled transaction, do nothing.
         """
         with self:
             pending_tx = self.session.get(Tx, pending_tx_id)

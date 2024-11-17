@@ -111,7 +111,7 @@ def test_settle_pending_transaction(ledger, db):
     )
 
     settlement_tx_idempotency_key = uuid4()
-    settlement_tx = ledger.settle_pending_transaction(
+    settlement_tx = ledger.settle_transaction(
         idempotency_key=settlement_tx_idempotency_key,
         pending_tx_id=pending_tx,
     )
@@ -140,7 +140,7 @@ def test_list_transactions(ledger, db):
         amount=Money(Decimal("60")),
     )
 
-    settlement_tx = ledger.settle_pending_transaction(
+    settlement_tx = ledger.settle_transaction(
         idempotency_key=uuid4(),
         pending_tx_id=tx1,
     )
