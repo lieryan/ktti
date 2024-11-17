@@ -1,9 +1,10 @@
 from decimal import Decimal
 from enum import Enum
+from hashlib import sha256
 from uuid import UUID, uuid4
 
 import sqlalchemy
-from sqlalchemy import create_engine, String, ForeignKey
+from sqlalchemy import create_engine, String, ForeignKey, BINARY
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -30,12 +31,18 @@ class TxType(Enum):
 class Tx(Base):
     __tablename__ = "tx"
 
-    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    id: Mapped[bytes] = mapped_column(BINARY(32), primary_key=True)
     idempotency_key: Mapped[UUID] = mapped_column(unique=True)
     account_id: Mapped[UUID] = mapped_column(ForeignKey("account.id"))
     account: Mapped[Account] = relationship()
     type: Mapped[TxType]
     amount: Mapped[Decimal]
+
+    def _set_transaction_hash(self) -> None:
+        assert self.id is None
+        data = f"{self.idempotency_key}|{self.account_id}|{self.type}|{self.amount}"
+        tx_hash = sha256(data.encode("ascii")).digest()
+        self.id = tx_hash
 
     def __repr__(self):
         return (

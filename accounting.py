@@ -10,7 +10,7 @@ from db import Account, Tx, TxType
 
 
 AccountId = NewType("AccountId", UUID)
-TransactionId = NewType("TransactionId", UUID)
+TransactionId = NewType("TransactionId", bytes)
 Money = NewType("Money", Decimal)
 
 
@@ -72,6 +72,8 @@ class Ledger(AutocommitSessionTransaction):
             type=TxType.PENDING,
             amount=amount,
         )
+        obj._set_transaction_hash()
+
         with self:
             self.session.add(obj)
             self.session.flush()
@@ -95,6 +97,8 @@ class Ledger(AutocommitSessionTransaction):
                 type=TxType.SETTLEMENT,
                 amount=settled_amount,
             )
+            obj._set_transaction_hash()
+
             self.session.add(obj)
             self.session.flush()
             return TransactionId(obj.id)

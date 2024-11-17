@@ -1,4 +1,5 @@
 from decimal import Decimal
+from typing import Any
 from uuid import UUID, uuid4
 
 import sqlalchemy
@@ -42,6 +43,10 @@ def table_exists(conn, tablename):
         return True
 
 
+def is_sha256_bytes(value: Any) -> bool:
+    return isinstance(value, bytes) and len(value) == 32
+
+
 def test_create_tables(conn):
     assert not table_exists(conn, "account")
 
@@ -76,7 +81,7 @@ def test_create_pending_transaction(ledger, db):
     )
 
     obj = ledger.session.execute(select(Tx)).scalar()
-    assert isinstance(obj.id, UUID)
+    assert is_sha256_bytes(obj.id)
     assert obj.idempotency_key == idempotency_key
     assert obj.account.id == andy
     assert obj.type == TxType.PENDING
@@ -117,7 +122,7 @@ def test_settle_pending_transaction(ledger, db):
     )
 
     obj = ledger.session.execute(select(Tx).where(Tx.id == settlement_tx)).scalar()
-    assert isinstance(obj.id, UUID)
+    assert is_sha256_bytes(obj.id)
     assert obj.idempotency_key == settlement_tx_idempotency_key
     assert obj.account.id == andy
     assert obj.type == TxType.SETTLEMENT
