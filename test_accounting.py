@@ -101,7 +101,7 @@ def test_cannot_create_transaction_with_duplicate_idempotency_key(ledger, db):
         )
 
 
-def test_settle_pending_transaction(ledger, db):
+def test_settle_transaction(ledger, db):
     andy, prev_tx_id = ledger.create_account("andy")
 
     pending_tx_idempotency_key = uuid4()
@@ -115,6 +115,7 @@ def test_settle_pending_transaction(ledger, db):
     settlement_tx = ledger.settle_transaction(
         idempotency_key=settlement_tx_idempotency_key,
         pending_tx_id=pending_tx,
+        prev_tx_id=pending_tx,
     )
 
     obj = ledger.session.execute(select(Tx).where(Tx.id == settlement_tx)).scalar()
@@ -123,6 +124,12 @@ def test_settle_pending_transaction(ledger, db):
     assert obj.account.id == andy
     assert obj.type == TxType.SETTLEMENT
     assert obj.amount == Money(Decimal("50"))
+
+    assert obj.prev_tx_id == pending_tx
+    assert obj.prev_current_balance == Money(Decimal("0"))
+    assert obj.prev_available_balance == Money(Decimal("0"))
+    assert obj.current_balance == Money(Decimal("50"))
+    assert obj.available_balance == Money(Decimal("50"))
 
 
 def test_list_transactions(ledger, db):
@@ -133,17 +140,20 @@ def test_list_transactions(ledger, db):
         idempotency_key=uuid4(),
         account_id=andy,
         amount=Money(Decimal("50")),
+        prev_tx_id=andy_prev_tx_id,
     )
 
     tx2 = ledger.create_pending_transaction(
         idempotency_key=uuid4(),
         account_id=andy,
         amount=Money(Decimal("60")),
+        prev_tx_id=tx1,
     )
 
     settlement_tx = ledger.settle_transaction(
         idempotency_key=uuid4(),
         pending_tx_id=tx1,
+        prev_tx_id=tx2,
     )
 
     tx_on_other_account = ledger.create_pending_transaction(

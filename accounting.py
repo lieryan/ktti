@@ -112,6 +112,7 @@ class Ledger(AutocommitSessionTransaction):
         pending_tx_id is already a settled transaction, do nothing.
         """
         with self:
+            prev_tx = self.session.get(Tx, prev_tx_id)
             pending_tx = self.session.get(Tx, pending_tx_id)
             settled_amount = pending_tx.amount  # TODO: calculate settled amount
             obj = Tx(
@@ -123,8 +124,8 @@ class Ledger(AutocommitSessionTransaction):
                 prev_tx_id=prev_tx_id,
                 prev_current_balance=Money(Decimal(0)),
                 prev_available_balance=Money(Decimal(0)),
-                current_balance=Money(Decimal(0)),
-                available_balance=Money(Decimal(0)),
+                current_balance=prev_tx.current_balance + settled_amount,
+                available_balance=prev_tx.available_balance + settled_amount,
             )
             obj._set_transaction_hash()
 
