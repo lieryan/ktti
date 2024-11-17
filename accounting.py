@@ -1,6 +1,6 @@
 from decimal import Decimal
 from typing import Optional, NewType
-from uuid import UUID
+from uuid import UUID, uuid4
 from dataclasses import dataclass
 
 from sqlalchemy import select
@@ -53,10 +53,25 @@ class Ledger(AutocommitSessionTransaction):
         self,
         name: str,
     ) -> AccountId:
-        obj = Account(name=name)
         with self:
+            obj = Account(name=name)
+
             self.session.add(obj)
             self.session.flush()
+
+            new_account_tx = Tx(
+                idempotency_key=uuid4(),
+                account_id=obj.id,
+                type=TxType.NEW_ACCOUNT,
+                amount=Money(Decimal(0)),
+                prev_current_balance=Money(Decimal(0)),
+                prev_available_balance=Money(Decimal(0)),
+                current_balance=Money(Decimal(0)),
+                available_balance=Money(Decimal(0)),
+            )
+            new_account_tx._set_transaction_hash()
+            self.session.add(new_account_tx)
+
             return AccountId(obj.id)
 
     def create_pending_transaction(

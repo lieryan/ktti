@@ -56,15 +56,22 @@ def test_create_tables(conn):
 
 
 def test_create_account(ledger, db):
-    ledger.create_account("andy")
+    andy = ledger.create_account("andy")
 
     account = ledger.session.execute(select(Account)).scalar()
     assert isinstance(account.id, UUID)
     assert account.name == "andy"
 
+    new_account_tx = ledger.session.execute(select(Tx)).scalar()
+    assert is_sha256_bytes(new_account_tx.id)
+    assert new_account_tx.account_id == andy
+    assert new_account_tx.type == TxType.NEW_ACCOUNT
+    assert new_account_tx.amount == Money(Decimal(0))
+    assert new_account_tx.current_balance == Money(Decimal(0))
+    assert new_account_tx.available_balance == Money(Decimal(0))
 
 def test_cannot_create_two_accounts_with_the_same_name(ledger, db):
-    ledger.create_account("andy")
+    andy = ledger.create_account("andy")
 
     with raises(sqlalchemy.exc.IntegrityError):
         ledger.create_account("andy")

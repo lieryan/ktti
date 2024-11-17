@@ -24,6 +24,7 @@ class Account(Base):
         )
 
 class TxType(Enum):
+    NEW_ACCOUNT = "n"
     PENDING = "p"
     SETTLEMENT = "s"
 
@@ -37,6 +38,11 @@ class Tx(Base):
     account: Mapped[Account] = relationship()
     type: Mapped[TxType]
     amount: Mapped[Decimal]
+
+    prev_current_balance: Mapped[Decimal]
+    prev_available_balance: Mapped[Decimal]
+    current_balance: Mapped[Decimal]
+    available_balance: Mapped[Decimal]
 
     def _set_transaction_hash(self) -> None:
         assert self.id is None
