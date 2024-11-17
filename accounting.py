@@ -1,6 +1,7 @@
 from decimal import Decimal
 from typing import Optional, NewType
 from uuid import UUID
+from dataclasses import dataclass
 
 from sqlalchemy.orm import Session
 
@@ -13,6 +14,15 @@ Money = NewType("Money", Decimal)
 
 class Transaction:
     pass
+
+
+@dataclass
+class Balance:
+    # Amount of money owned by the account
+    current: Money
+
+    # Amount of money that is available to use (available = current - pending)
+    available: Money
 
 
 class AutocommitSessionTransaction:
@@ -99,17 +109,14 @@ class Ledger(AutocommitSessionTransaction):
         """When `amount` is provided, do a partial refund."""
         pass
 
-    def get_current_balance(
+    def get_balance(
         self,
         account_id: AccountId,
-    ) -> Money:
-        return Money(Decimal())
-
-    def get_available_balance(
-        self,
-        account_id: AccountId,
-    ) -> Money:
-        return Money(Decimal())
+    ) -> Balance:
+        return Balance(
+            current=Money(Decimal()),
+            available=Money(Decimal()),
+        )
 
     def list_transactions(
         self,
