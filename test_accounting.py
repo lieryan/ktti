@@ -68,14 +68,16 @@ def test_cannot_create_two_accounts_with_the_same_name(ledger, db):
 def test_create_pending_transaction(ledger, db):
     andy = ledger.create_account("andy")
 
+    idempotency_key = uuid4()
     transaction = ledger.create_pending_transaction(
-        tx_id=uuid4(),
+        idempotency_key=idempotency_key,
         account_id=andy,
         amount=Money(Decimal("50")),
     )
 
     obj = ledger.session.execute(select(Tx)).scalar()
     assert isinstance(obj.id, UUID)
+    assert obj.idempotency_key == idempotency_key
     assert obj.account.id == andy
     assert obj.type == TxType.PENDING
     assert obj.amount == Money(Decimal("50"))
@@ -83,19 +85,23 @@ def test_create_pending_transaction(ledger, db):
 
 def test_settle_pending_transaction(ledger, db):
     andy = ledger.create_account("andy")
+
+    pending_transaction_idempotency_key = uuid4()
     pending_transaction = ledger.create_pending_transaction(
-        tx_id=uuid4(),
+        idempotency_key=pending_transaction_idempotency_key,
         account_id=andy,
         amount=Money(Decimal("50")),
     )
 
+    settlement_transaction_idempotency_key = uuid4()
     settlement_transaction = ledger.settle_pending_transaction(
-        tx_id=uuid4(),
+        idempotency_key=settlement_transaction_idempotency_key,
         pending_tx_id=pending_transaction,
     )
 
     obj = ledger.session.execute(select(Tx).where(Tx.id == settlement_transaction)).scalar()
     assert isinstance(obj.id, UUID)
+    assert obj.idempotency_key == settlement_transaction_idempotency_key
     assert obj.account.id == andy
     assert obj.type == TxType.SETTLEMENT
     assert obj.amount == Money(Decimal("50"))

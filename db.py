@@ -27,6 +27,7 @@ class Tx(Base):
     __tablename__ = "tx"
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    idempotency_key: Mapped[UUID]
     account_id: Mapped[UUID] = mapped_column(ForeignKey("account.id"))
     account: Mapped[Account] = relationship()
     type: Mapped[TxType]

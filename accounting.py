@@ -53,13 +53,13 @@ class Ledger(AutocommitSessionTransaction):
 
     def create_pending_transaction(
         self,
-        tx_id: TransactionId,
+        idempotency_key: TransactionId,
         account_id: AccountId,
         amount: Money,
         last_tx_id: Optional[TransactionId] = None,
     ):
         obj = Tx(
-            id=tx_id,
+            idempotency_key=idempotency_key,
             account_id=account_id,
             type=TxType.PENDING,
             amount=amount,
@@ -71,18 +71,18 @@ class Ledger(AutocommitSessionTransaction):
 
     def settle_pending_transaction(
         self,
-        tx_id: TransactionId,
+        idempotency_key: TransactionId,
         pending_tx_id: TransactionId,
     ):
         """
-        Reflect the transaction amount to the current balance, if tx_id is already
-        a settled transaction, do nothing.
+        Reflect the transaction amount to the current balance, if
+        idempotency_key is already a settled transaction, do nothing.
         """
         with self:
             pending_tx = self.session.get(Tx, pending_tx_id)
             settled_amount = pending_tx.amount # TODO: calculate settled amount
             obj = Tx(
-                id=tx_id,
+                idempotency_key=idempotency_key,
                 account_id=pending_tx.account_id,
                 type=TxType.SETTLEMENT,
                 amount=settled_amount,
