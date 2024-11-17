@@ -3,6 +3,7 @@ from typing import Optional, NewType
 from uuid import UUID
 from dataclasses import dataclass
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from db import Account, Tx, TxType
@@ -11,9 +12,6 @@ from db import Account, Tx, TxType
 AccountId = NewType("AccountId", UUID)
 TransactionId = NewType("TransactionId", UUID)
 Money = NewType("Money", Decimal)
-
-class Transaction:
-    pass
 
 
 @dataclass
@@ -31,6 +29,7 @@ class AutocommitSessionTransaction:
     database transaction when using an instance of the class as a context
     manager.
     """
+
     def __enter__(self):
         return self.session.begin()
 
@@ -59,7 +58,6 @@ class Ledger(AutocommitSessionTransaction):
             self.session.add(obj)
             self.session.flush()
             return AccountId(obj.id)
-
 
     def create_pending_transaction(
         self,
@@ -90,7 +88,7 @@ class Ledger(AutocommitSessionTransaction):
         """
         with self:
             pending_tx = self.session.get(Tx, pending_tx_id)
-            settled_amount = pending_tx.amount # TODO: calculate settled amount
+            settled_amount = pending_tx.amount  # TODO: calculate settled amount
             obj = Tx(
                 idempotency_key=idempotency_key,
                 account_id=pending_tx.account_id,
@@ -121,13 +119,17 @@ class Ledger(AutocommitSessionTransaction):
     def list_transactions(
         self,
         account_id: AccountId,
-    ) -> Transaction:
-        return Transaction()
+    ) -> list[Tx]:
+        return list(
+            self.session.execute(
+                select(Tx).where(Tx.account_id == account_id)
+            ).scalars()
+        )
 
     ### UI
 
     def print_transactions(
         self,
         account_id: AccountId,
-    ) -> Transaction:
-        return Transaction()
+    ) -> None:
+        pass
