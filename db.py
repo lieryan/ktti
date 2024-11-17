@@ -51,7 +51,7 @@ class Tx(Base):
 
     @property
     def tx_hash(self) -> bytes:
-        data = f"{self.idempotency_key}|{self.account_id}|{self.type}|{self.amount}"
+        data = f"{self.idempotency_key}|{self.account_id}|{self.type}|{self.amount.normalize()}"
         tx_hash = sha256(data.encode("ascii")).digest()
         assert self.id is None or self.id == tx_hash
         return tx_hash
