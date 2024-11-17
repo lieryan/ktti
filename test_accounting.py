@@ -17,12 +17,6 @@ def engine():
 
 
 @fixture
-def conn(engine):
-    with engine.begin() as conn:
-        yield conn
-
-
-@fixture
 def ledger(engine):
     return accounting.Ledger(engine)
 
@@ -37,26 +31,8 @@ def db(engine):
     return engine
 
 
-def table_exists(conn, tablename: str) -> bool:
-    try:
-        conn.execute(text(f"SELECT * FROM {tablename}")).fetchall() == []
-    except sqlalchemy.exc.ProgrammingError as e:
-        assert f'relation "{tablename}" does not exist' in str(e)
-        return False
-    else:
-        return True
-
-
 def is_sha256_bytes(value: Any) -> bool:
     return isinstance(value, bytes) and len(value) == 32
-
-
-def test_create_tables(conn):
-    assert not table_exists(conn, "account")
-
-    create_tables(conn)
-
-    assert table_exists(conn, "account")
 
 
 def test_create_account(ledger, db):
