@@ -36,7 +36,7 @@ def is_sha256_bytes(value: Any) -> bool:
 
 
 def test_create_account(ledger, db):
-    andy = ledger.create_account("andy")
+    andy, prev_tx_id = ledger.create_account("andy")
 
     account = ledger.session.execute(select(Account)).scalar()
     assert isinstance(account.id, UUID)
@@ -51,49 +51,58 @@ def test_create_account(ledger, db):
     assert new_account_tx.available_balance == Money(Decimal(0))
 
 def test_cannot_create_two_accounts_with_the_same_name(ledger, db):
-    andy = ledger.create_account("andy")
+    andy, prev_tx_id = ledger.create_account("andy")
 
     with raises(sqlalchemy.exc.IntegrityError):
         ledger.create_account("andy")
 
 
 def test_create_pending_transaction(ledger, db):
-    andy = ledger.create_account("andy")
+    andy, prev_tx_id = ledger.create_account("andy")
 
     idempotency_key = uuid4()
     tx = ledger.create_pending_transaction(
         idempotency_key=idempotency_key,
         account_id=andy,
         amount=Money(Decimal("50")),
+        prev_tx_id=prev_tx_id,
     )
 
-    obj = ledger.session.execute(select(Tx)).scalar()
+    obj = ledger.session.execute(select(Tx).where(Tx.type == TxType.PENDING)).scalar()
     assert is_sha256_bytes(obj.id)
     assert obj.idempotency_key == idempotency_key
     assert obj.account.id == andy
     assert obj.type == TxType.PENDING
     assert obj.amount == Money(Decimal("50"))
 
+    assert obj.prev_tx_id == prev_tx_id
+    assert obj.prev_current_balance == Money(Decimal("0"))
+    assert obj.prev_available_balance == Money(Decimal("0"))
+    assert obj.current_balance == Money(Decimal("0"))
+    assert obj.available_balance == Money(Decimal("0"))
+
 
 def test_cannot_create_transaction_with_duplicate_idempotency_key(ledger, db):
-    andy = ledger.create_account("andy")
+    andy, prev_tx_id = ledger.create_account("andy")
 
     idempotency_key = uuid4()
     tx = ledger.create_pending_transaction(
         idempotency_key=idempotency_key,
         account_id=andy,
         amount=Money(Decimal("50")),
+        prev_tx_id=prev_tx_id,
     )
     with raises(sqlalchemy.exc.IntegrityError):
         tx = ledger.create_pending_transaction(
             idempotency_key=idempotency_key,
             account_id=andy,
             amount=Money(Decimal("50")),
+            prev_tx_id=prev_tx_id,
         )
 
 
 def test_settle_pending_transaction(ledger, db):
-    andy = ledger.create_account("andy")
+    andy, prev_tx_id = ledger.create_account("andy")
 
     pending_tx_idempotency_key = uuid4()
     pending_tx = ledger.create_pending_transaction(
@@ -117,8 +126,8 @@ def test_settle_pending_transaction(ledger, db):
 
 
 def test_list_transactions(ledger, db):
-    andy = ledger.create_account("andy")
-    bill = ledger.create_account("bill")
+    andy, andy_prev_tx_id = ledger.create_account("andy")
+    bill, bill_prev_tx_id = ledger.create_account("bill")
 
     tx1 = ledger.create_pending_transaction(
         idempotency_key=uuid4(),

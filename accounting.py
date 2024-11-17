@@ -52,7 +52,7 @@ class Ledger(AutocommitSessionTransaction):
     def create_account(
         self,
         name: str,
-    ) -> AccountId:
+    ) -> tuple[AccountId, TransactionId]:
         with self:
             obj = Account(name=name)
 
@@ -64,6 +64,7 @@ class Ledger(AutocommitSessionTransaction):
                 account_id=obj.id,
                 type=TxType.NEW_ACCOUNT,
                 amount=Money(Decimal(0)),
+                prev_tx_id=None,
                 prev_current_balance=Money(Decimal(0)),
                 prev_available_balance=Money(Decimal(0)),
                 current_balance=Money(Decimal(0)),
@@ -72,20 +73,26 @@ class Ledger(AutocommitSessionTransaction):
             new_account_tx._set_transaction_hash()
             self.session.add(new_account_tx)
 
-            return AccountId(obj.id)
+            return AccountId(obj.id), TransactionId(new_account_tx.id)
 
     def create_pending_transaction(
         self,
         idempotency_key: TransactionId,
         account_id: AccountId,
         amount: Money,
-        last_tx_id: Optional[TransactionId] = None,
+        prev_tx_id: Optional[TransactionId] = None,
     ):
         obj = Tx(
             idempotency_key=idempotency_key,
             account_id=account_id,
             type=TxType.PENDING,
             amount=amount,
+
+            prev_tx_id=prev_tx_id,
+            prev_current_balance=Money(Decimal(0)),
+            prev_available_balance=Money(Decimal(0)),
+            current_balance=Money(Decimal(0)),
+            available_balance=Money(Decimal(0)),
         )
         obj._set_transaction_hash()
 
@@ -98,6 +105,7 @@ class Ledger(AutocommitSessionTransaction):
         self,
         idempotency_key: TransactionId,
         pending_tx_id: TransactionId,
+        prev_tx_id: Optional[TransactionId] = None,
     ):
         """
         Reflect the transaction amount to the current balance, if
@@ -111,6 +119,12 @@ class Ledger(AutocommitSessionTransaction):
                 account_id=pending_tx.account_id,
                 type=TxType.SETTLEMENT,
                 amount=settled_amount,
+
+                prev_tx_id=prev_tx_id,
+                prev_current_balance=Money(Decimal(0)),
+                prev_available_balance=Money(Decimal(0)),
+                current_balance=Money(Decimal(0)),
+                available_balance=Money(Decimal(0)),
             )
             obj._set_transaction_hash()
 

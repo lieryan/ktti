@@ -2,9 +2,10 @@ from decimal import Decimal
 from enum import Enum
 from hashlib import sha256
 from uuid import UUID, uuid4
+from typing import Optional
 
 import sqlalchemy
-from sqlalchemy import create_engine, String, ForeignKey, BINARY
+from sqlalchemy import create_engine, String, ForeignKey, ForeignKeyConstraint, UniqueConstraint
 from sqlalchemy.dialects.postgresql import BYTEA
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -32,6 +33,10 @@ class TxType(Enum):
 
 class Tx(Base):
     __tablename__ = "tx"
+    __table_args__ = (
+        ForeignKeyConstraint(["prev_tx_id", "prev_current_balance", "prev_available_balance"], ["tx.id", "tx.current_balance", "tx.available_balance"]),
+        UniqueConstraint("id", "current_balance", "available_balance"),
+    )
 
     id: Mapped[bytes] = mapped_column(BYTEA(32), primary_key=True)
     idempotency_key: Mapped[UUID] = mapped_column(unique=True)
@@ -40,6 +45,8 @@ class Tx(Base):
     type: Mapped[TxType]
     amount: Mapped[Decimal]
 
+    prev_tx_id: Mapped[Optional[bytes]] = mapped_column(BYTEA(32), nullable=True)
+    prev_tx: Mapped["Tx"] = relationship()
     prev_current_balance: Mapped[Decimal]
     prev_available_balance: Mapped[Decimal]
     current_balance: Mapped[Decimal]
