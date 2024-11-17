@@ -83,6 +83,23 @@ def test_create_pending_transaction(ledger, db):
     assert obj.amount == Money(Decimal("50"))
 
 
+def test_cannot_create_transaction_with_duplicate_idempotency_key(ledger, db):
+    andy = ledger.create_account("andy")
+
+    idempotency_key = uuid4()
+    transaction = ledger.create_pending_transaction(
+        idempotency_key=idempotency_key,
+        account_id=andy,
+        amount=Money(Decimal("50")),
+    )
+    with raises(sqlalchemy.exc.IntegrityError):
+        transaction = ledger.create_pending_transaction(
+            idempotency_key=idempotency_key,
+            account_id=andy,
+            amount=Money(Decimal("50")),
+        )
+
+
 def test_settle_pending_transaction(ledger, db):
     andy = ledger.create_account("andy")
 
