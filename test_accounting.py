@@ -153,14 +153,16 @@ def test_list_transactions(ledger, db):
     )
 
     txs = ledger.list_transactions(account_id=andy)
-    assert len(txs) == 3
+    assert len(txs) == 4
     assert all(tx.account_id == andy for tx in txs)
 
-    assert txs[0].type == TxType.PENDING
-    assert txs[0].amount == Money(Decimal("50"))
+    assert txs[0].type == TxType.NEW_ACCOUNT
 
     assert txs[1].type == TxType.PENDING
-    assert txs[1].amount == Money(Decimal("60"))
+    assert txs[1].amount == Money(Decimal("50"))
 
-    assert txs[2].type == TxType.SETTLEMENT
-    assert txs[2].amount == Money(Decimal("50"))
+    assert txs[2].type == TxType.PENDING
+    assert txs[2].amount == Money(Decimal("60"))
+
+    assert txs[3].type == TxType.SETTLEMENT
+    assert txs[3].amount == Money(Decimal("50"))
