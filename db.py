@@ -5,6 +5,7 @@ from uuid import UUID, uuid4
 
 import sqlalchemy
 from sqlalchemy import create_engine, String, ForeignKey, BINARY
+from sqlalchemy.dialects.postgresql import BYTEA
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -32,7 +33,7 @@ class TxType(Enum):
 class Tx(Base):
     __tablename__ = "tx"
 
-    id: Mapped[bytes] = mapped_column(BINARY(32), primary_key=True)
+    id: Mapped[bytes] = mapped_column(BYTEA(32), primary_key=True)
     idempotency_key: Mapped[UUID] = mapped_column(unique=True)
     account_id: Mapped[UUID] = mapped_column(ForeignKey("account.id"))
     account: Mapped[Account] = relationship()
@@ -62,7 +63,7 @@ class Tx(Base):
 
 
 def connect():
-    return create_engine("sqlite:///accounting.db")
+    return create_engine("")
 
 
 def create_tables(conn: sqlalchemy.Connection) -> None:

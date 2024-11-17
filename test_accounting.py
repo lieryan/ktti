@@ -13,7 +13,7 @@ from db import create_tables, Account, Tx, TxType
 
 @fixture
 def engine():
-    return create_engine("sqlite://")
+    return create_engine("postgresql+psycopg://postgres:password@localhost:5432/postgres")
 
 
 @fixture
@@ -28,16 +28,20 @@ def ledger(engine):
 
 
 @fixture
-def db(conn):
-    create_tables(conn)
-    return conn
+def db(engine):
+    create_tables(engine)
+    with engine.begin() as conn:
+        conn.execute(text("DELETE FROM tx"))
+        conn.execute(text("DELETE FROM account"))
+        conn.commit()
+    return engine
 
 
 def table_exists(conn, tablename: str) -> bool:
     try:
         conn.execute(text(f"SELECT * FROM {tablename}")).fetchall() == []
-    except sqlalchemy.exc.OperationalError as e:
-        assert "no such table" in str(e)
+    except sqlalchemy.exc.ProgrammingError as e:
+        assert f'relation "{tablename}" does not exist' in str(e)
         return False
     else:
         return True
