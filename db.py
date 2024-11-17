@@ -40,13 +40,18 @@ class Tx(Base):
 
     def _set_transaction_hash(self) -> None:
         assert self.id is None
+        self.id = self.tx_hash
+
+    @property
+    def tx_hash(self) -> bytes:
         data = f"{self.idempotency_key}|{self.account_id}|{self.type}|{self.amount}"
         tx_hash = sha256(data.encode("ascii")).digest()
-        self.id = tx_hash
+        assert self.id is None or self.id == tx_hash
+        return tx_hash
 
     def __repr__(self) -> str:
         return (
-            f"<Tx {self.id} {self.type.name} account={self.account.name} amount={self.amount}>"
+            f"<Tx {self.tx_hash.hex()} {self.type.name} account={self.account.name if self.account else self.account_id} amount={self.amount}>"
         )
 
 
