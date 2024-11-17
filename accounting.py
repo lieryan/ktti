@@ -30,6 +30,10 @@ class AutocommitSessionTransaction:
     manager.
     """
 
+    def __init__(self, engine):
+        self.engine = engine
+        self.session = Session(self.engine)
+
     def __enter__(self):
         return self.session.begin()
 
@@ -45,10 +49,6 @@ class AutocommitSessionTransaction:
 
 
 class Ledger(AutocommitSessionTransaction):
-    def __init__(self, engine):
-        self.engine = engine
-        self.session = Session(self.engine)
-
     def create_account(
         self,
         name: str,
