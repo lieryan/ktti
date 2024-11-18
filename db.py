@@ -45,15 +45,18 @@ class Tx(Base):
         # account
         ForeignKeyConstraint(
             [
-                "prev_tx_id",
                 "account_id",
+                "prev_tx_id",
             ],
             [
-                "tx.id",
                 "tx.account_id",
+                "tx.id",
             ],
         ),
-        UniqueConstraint("id", "account_id"),
+        UniqueConstraint(
+            "account_id",
+            "id",
+        ),
 
         # prev_current_balance and prev_available_balance are
         # denormalized/duplicated correctly from their prev_tx
