@@ -125,6 +125,29 @@ def test_cannot_create_two_accounts_with_the_same_name(ledger, db):
         ledger.create_account("andy")
 
 
+def test_cannot_create_new_account_transaction_for_the_same_account(ledger, db):
+    andy, new_account_tx_id = ledger.create_account("andy")
+    with assert_does_not_create_any_new_tx(ledger), \
+            raises(
+                sqlalchemy.exc.IntegrityError,
+                match="Key \\(account_id\\)=\\(........-....-....-....-............\\) already exists.",
+            ) as e:
+        with ledger:
+            new_account_tx = Tx(
+                idempotency_key=uuid4(),
+                account_id=andy,
+                type=TxType.NEW_ACCOUNT,
+                amount=Money(Decimal(0)),
+                prev_tx_id=None,
+                prev_current_balance=Money(Decimal(0)),
+                prev_available_balance=Money(Decimal(0)),
+                current_balance=Money(Decimal(0)),
+                available_balance=Money(Decimal(0)),
+            )
+            new_account_tx._set_transaction_hash()
+            ledger.session.add(new_account_tx)
+
+
 def test_create_pending_transaction(
     ledger,
     db,

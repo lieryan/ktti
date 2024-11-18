@@ -1,8 +1,8 @@
 from decimal import Decimal
 from enum import Enum
 from hashlib import sha256
-from uuid import UUID, uuid4
 from typing import Optional
+from uuid import UUID, uuid4
 
 import sqlalchemy
 from sqlalchemy import (
@@ -11,6 +11,7 @@ from sqlalchemy import (
     ForeignKey,
     ForeignKeyConstraint,
     UniqueConstraint,
+    Index,
 )
 from sqlalchemy.dialects.postgresql import BYTEA
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
@@ -67,6 +68,10 @@ class Tx(Base):
             ],
         ),
         UniqueConstraint("id", "current_balance", "available_balance"),
+
+        # this unique index/constraints that you can only have one NEW_ACCOUNT
+        # transaction for each account
+        Index("tx_only_one_new_account_tx_per_account_id", "account_id", unique=True, postgresql_where="type = 'NEW_ACCOUNT'"),
     )
 
     id: Mapped[bytes] = mapped_column(BYTEA(32), primary_key=True)
