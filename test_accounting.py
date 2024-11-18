@@ -415,3 +415,41 @@ def test_list_transactions(
 
     assert txs[3].type == TxType.SETTLEMENT
     assert txs[3].amount == Money(Decimal("50"))
+
+
+def test_get_latest_transaction(
+    ledger,
+    db,
+    andy,
+    andy_new_account_tx_id,
+):
+    tx1 = ledger.create_pending_transaction(
+        idempotency_key=uuid4(),
+        account_id=andy,
+        amount=Money(Decimal("50")),
+        prev_tx_id=andy_new_account_tx_id,
+    )
+
+    tx2 = ledger.create_pending_transaction(
+        idempotency_key=uuid4(),
+        account_id=andy,
+        amount=Money(Decimal("50")),
+        prev_tx_id=tx1,
+    )
+
+    tx3 = ledger.settle_transaction(
+        idempotency_key=uuid4(),
+        original_tx_id=tx1,
+        prev_tx_id=tx2,
+    )
+
+    tx4 = ledger.create_pending_transaction(
+        idempotency_key=uuid4(),
+        account_id=andy,
+        amount=Money(Decimal("50")),
+        prev_tx_id=tx3,
+    )
+
+    latest_tx = ledger.get_latest_transaction(andy)
+
+    assert latest_tx == tx4

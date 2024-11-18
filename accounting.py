@@ -165,6 +165,21 @@ class Ledger(AutocommitSessionTransaction):
             ).scalars()
         )
 
+    def get_latest_transaction(
+        self,
+        account_id: AccountId,
+    ):
+        """Find the Tx that is never referenced by other Tx.prev_id, this is always the latest Tx"""
+        # FIXME: Calculating the head of the transactions in this way can be
+        #        slow if there's a lot of transactions in the account.
+        #        We would need to record the head of the log in the accounts
+        #        table to optimize this lookup.
+        with self:
+            tx_ids = set(self.session.execute(select(Tx.id).where(Tx.account_id == account_id)).scalars())
+            prev_tx_ids = set(self.session.execute(select(Tx.prev_tx_id).where(Tx.account_id == account_id)).scalars())
+            latest_tx, = tx_ids - prev_tx_ids
+            return latest_tx
+
     ### UI
 
     def print_transactions(
