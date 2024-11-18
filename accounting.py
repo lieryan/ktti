@@ -85,7 +85,7 @@ class Ledger(AutocommitSessionTransaction):
         account_id: AccountId,
         amount: Money,
         prev_tx_id: Optional[TransactionId] = None,
-    ):
+    ) -> TransactionId:
         with self:
             obj = Tx(
                 idempotency_key=idempotency_key,
@@ -94,6 +94,8 @@ class Ledger(AutocommitSessionTransaction):
                 amount=amount,
             )
             obj._set_prev_tx(self.session.get(Tx, prev_tx_id))
+            if obj.is_credit:
+                obj.available_balance += amount
             obj._set_transaction_hash()
             obj.original_tx_id = obj.id
 

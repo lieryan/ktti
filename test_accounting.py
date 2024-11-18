@@ -55,6 +55,28 @@ def andy_new_account_tx_id(_andy):
 
 
 @fixture
+def andy_account_balance_is_100(ledger, db, andy, andy_new_account_tx_id):
+    debit_tx_id = ledger.create_pending_transaction(
+        idempotency_key=uuid4(),
+        account_id=andy,
+        amount=Money(Decimal("100")),
+        prev_tx_id=andy_new_account_tx_id,
+    )
+    settlement_tx_id = ledger.settle_transaction(
+        idempotency_key=uuid4(),
+        original_tx_id=debit_tx_id,
+        prev_tx_id=debit_tx_id,
+    )
+
+    with ledger:
+        settlement_tx = ledger.session.get(Tx, settlement_tx_id)
+        assert settlement_tx.current_balance == Decimal(100)
+        assert settlement_tx.available_balance == Decimal(100)
+
+    return settlement_tx_id
+
+
+@fixture
 def _bill(ledger):
     bill, prev_tx_id = ledger.create_account("bill")
     return bill, prev_tx_id
@@ -97,11 +119,11 @@ def assert_tx_balances(
 def test_create_account(ledger, db):
     andy, new_account_tx_id = ledger.create_account("andy")
 
-    account = ledger.session.execute(select(Account)).scalar()
+    account = ledger.session.execute(select(Account)).scalar_one()
     assert isinstance(account.id, UUID)
     assert account.name == "andy"
 
-    new_account_tx = ledger.session.execute(select(Tx)).scalar()
+    new_account_tx = ledger.session.execute(select(Tx)).scalar_one()
     assert is_sha256_bytes(new_account_tx.id)
     assert new_account_tx.account_id == andy
     assert new_account_tx.type == TxType.NEW_ACCOUNT
@@ -148,7 +170,7 @@ def test_cannot_create_new_account_transaction_for_the_same_account(ledger, db):
             ledger.session.add(new_account_tx)
 
 
-def test_create_pending_transaction(
+def test_create_pending_transaction_debit(
     ledger,
     db,
     andy,
@@ -162,7 +184,7 @@ def test_create_pending_transaction(
         prev_tx_id=andy_new_account_tx_id,
     )
 
-    obj = ledger.session.execute(select(Tx).where(Tx.type == TxType.PENDING)).scalar()
+    obj = ledger.session.execute(select(Tx).where(Tx.type == TxType.PENDING)).scalar_one()
     assert is_sha256_bytes(obj.id)
     assert obj.idempotency_key == idempotency_key
     assert obj.account.id == andy
@@ -178,6 +200,57 @@ def test_create_pending_transaction(
         prev_current_balance=Money(Decimal(0)),
         prev_available_balance=Money(Decimal(0)),
     )
+
+
+def test_create_pending_transaction_credit(
+    ledger,
+    db,
+    andy,
+    andy_new_account_tx_id,
+    andy_account_balance_is_100,
+):
+    idempotency_key = uuid4()
+    pending_tx = ledger.create_pending_transaction(
+        idempotency_key=idempotency_key,
+        account_id=andy,
+        amount=Money(Decimal("-50")),
+        prev_tx_id=andy_account_balance_is_100,
+    )
+
+    obj = ledger.session.get(Tx, pending_tx)
+    assert is_sha256_bytes(obj.id)
+    assert obj.idempotency_key == idempotency_key
+    assert obj.account.id == andy
+    assert pending_tx is not None and obj.original_tx_id == pending_tx, "The original_tx of the pending Tx is the pending Tx itself"
+    assert obj.type == TxType.PENDING
+    assert obj.amount == Money(Decimal("-50"))
+
+    assert obj.prev_tx_id == andy_account_balance_is_100
+    assert_tx_balances(
+        obj,
+        current_balance=Money(Decimal(100)),
+        available_balance=Money(Decimal(50)), # pending credit transaction reduces available balance
+        prev_current_balance=Money(Decimal(100)),
+        prev_available_balance=Money(Decimal(100)),
+    )
+
+
+def test_create_pending_transaction_credit_insufficient_fund(
+    ledger,
+    db,
+    andy,
+    andy_new_account_tx_id,
+    andy_account_balance_is_100,
+):
+    idempotency_key = uuid4()
+    with assert_does_not_create_any_new_tx(ledger), \
+            raises(sqlalchemy.exc.IntegrityError, match='violates check constraint "tx_positive_available_balance"'):
+        pending_tx = ledger.create_pending_transaction(
+            idempotency_key=idempotency_key,
+            account_id=andy,
+            amount=Money(Decimal("-150")),
+            prev_tx_id=andy_account_balance_is_100,
+        )
 
 
 def test_cannot_create_transaction_with_duplicate_idempotency_key(
@@ -290,7 +363,7 @@ def test_settle_transaction(ledger, db, andy, andy_new_account_tx_id):
         prev_tx_id=pending_tx,
     )
 
-    obj = ledger.session.execute(select(Tx).where(Tx.id == settlement_tx)).scalar()
+    obj = ledger.session.execute(select(Tx).where(Tx.id == settlement_tx)).scalar_one()
     assert is_sha256_bytes(obj.id)
     assert obj.idempotency_key == settlement_tx_idempotency_key
     assert obj.account.id == andy
