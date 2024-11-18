@@ -127,6 +127,15 @@ class Tx(Base):
         foreign_keys=[prev_tx_id, account_id],
     )
 
+    def _set_prev_tx(self, prev_tx) -> None:
+        assert self.id is None
+
+        self.prev_tx_id = prev_tx.id
+        self.prev_current_balance = prev_tx.current_balance
+        self.prev_available_balance = prev_tx.available_balance
+        self.current_balance = prev_tx.current_balance
+        self.available_balance = prev_tx.available_balance
+
     def _set_transaction_hash(self) -> None:
         assert self.id is None
         self.id = self.tx_hash
