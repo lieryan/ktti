@@ -42,6 +42,25 @@ class TxType(Enum):
 class Tx(Base):
     __tablename__ = "tx"
     __table_args__ = (
+        # prev_tx_id forms a chain of Tx that are in sequential order of
+        # event processing.
+        # all Tx related through prev_tx_id chain must belong to the same
+        # account
+        ForeignKeyConstraint(
+            [
+                "account_id",
+                "prev_tx_id",
+            ],
+            [
+                "tx.account_id",
+                "tx.id",
+            ],
+        ),
+        UniqueConstraint(
+            "account_id",
+            "id",
+        ),
+
         # Tx with the same group_tx_id forms a Tx group that consists of
         #
         # - exactly one pending transaction
@@ -61,25 +80,6 @@ class Tx(Base):
         ),
         # TODO: add a constraint/trigger to check that the original tx must be
         #       a pending Tx
-
-        # prev_tx_id forms a chain of Tx that are in sequential order of
-        # event processing.
-        # all Tx related through prev_tx_id chain must belong to the same
-        # account
-        ForeignKeyConstraint(
-            [
-                "account_id",
-                "prev_tx_id",
-            ],
-            [
-                "tx.account_id",
-                "tx.id",
-            ],
-        ),
-        UniqueConstraint(
-            "account_id",
-            "id",
-        ),
 
         # prev_current_balance and prev_available_balance are
         # denormalized/duplicated correctly from their prev_tx
