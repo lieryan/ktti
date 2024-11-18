@@ -38,6 +38,38 @@ def is_sha256_bytes(value: Any) -> bool:
     return isinstance(value, bytes) and len(value) == 32
 
 
+@fixture
+def _andy(ledger):
+    andy, prev_tx_id = ledger.create_account("andy")
+    return andy, prev_tx_id
+
+
+@fixture
+def andy(_andy):
+    return _andy[0]
+
+
+@fixture
+def andy_new_account_tx_id(_andy):
+    return _andy[1]
+
+
+@fixture
+def _bill(ledger):
+    bill, prev_tx_id = ledger.create_account("bill")
+    return bill, prev_tx_id
+
+
+@fixture
+def bill(_bill):
+    return _bill[0]
+
+
+@fixture
+def bill_new_account_tx_id(_bill):
+    return _bill[1]
+
+
 @contextmanager
 def assert_does_not_create_any_new_tx(ledger):
     with ledger:
@@ -63,7 +95,7 @@ def assert_tx_balances(
 
 
 def test_create_account(ledger, db):
-    andy, prev_tx_id = ledger.create_account("andy")
+    andy, new_account_tx_id = ledger.create_account("andy")
 
     account = ledger.session.execute(select(Account)).scalar()
     assert isinstance(account.id, UUID)
@@ -84,22 +116,27 @@ def test_create_account(ledger, db):
 
 
 def test_cannot_create_two_accounts_with_the_same_name(ledger, db):
-    andy, prev_tx_id = ledger.create_account("andy")
-
+    andy, new_account_tx_id = ledger.create_account("andy")
     with assert_does_not_create_any_new_tx(ledger), \
-            raises(sqlalchemy.exc.IntegrityError):
+            raises(
+                sqlalchemy.exc.IntegrityError,
+                match="Key \\(name\\)=\\(andy\\) already exists.",
+            ) as e:
         ledger.create_account("andy")
 
 
-def test_create_pending_transaction(ledger, db):
-    andy, prev_tx_id = ledger.create_account("andy")
-
+def test_create_pending_transaction(
+    ledger,
+    db,
+    andy,
+    andy_new_account_tx_id,
+):
     idempotency_key = uuid4()
     tx = ledger.create_pending_transaction(
         idempotency_key=idempotency_key,
         account_id=andy,
         amount=Money(Decimal("50")),
-        prev_tx_id=prev_tx_id,
+        prev_tx_id=andy_new_account_tx_id,
     )
 
     obj = ledger.session.execute(select(Tx).where(Tx.type == TxType.PENDING)).scalar()
@@ -109,7 +146,7 @@ def test_create_pending_transaction(ledger, db):
     assert obj.type == TxType.PENDING
     assert obj.amount == Money(Decimal("50"))
 
-    assert obj.prev_tx_id == prev_tx_id
+    assert obj.prev_tx_id == andy_new_account_tx_id
     assert_tx_balances(
         obj,
         current_balance=Money(Decimal(0)),
@@ -119,15 +156,18 @@ def test_create_pending_transaction(ledger, db):
     )
 
 
-def test_cannot_create_transaction_with_duplicate_idempotency_key(ledger, db):
-    andy, prev_tx_id = ledger.create_account("andy")
-
+def test_cannot_create_transaction_with_duplicate_idempotency_key(
+    ledger,
+    db,
+    andy,
+    andy_new_account_tx_id,
+):
     idempotency_key = uuid4()
     tx = ledger.create_pending_transaction(
         idempotency_key=idempotency_key,
         account_id=andy,
         amount=Money(Decimal("50")),
-        prev_tx_id=prev_tx_id,
+        prev_tx_id=andy_new_account_tx_id,
     )
     with assert_does_not_create_any_new_tx(ledger), \
             raises(sqlalchemy.exc.IntegrityError):
@@ -135,18 +175,21 @@ def test_cannot_create_transaction_with_duplicate_idempotency_key(ledger, db):
             idempotency_key=idempotency_key,
             account_id=andy,
             amount=Money(Decimal("50")),
-            prev_tx_id=prev_tx_id,
+            prev_tx_id=andy_new_account_tx_id,
         )
 
 
-def test_next_tx_prev_relationships_tx_are_correctly_linked(ledger, db):
-    andy, new_account_tx_id = ledger.create_account("andy")
-
+def test_next_tx_prev_relationships_tx_are_correctly_linked(
+    ledger,
+    db,
+    andy,
+    andy_new_account_tx_id,
+):
     tx1 = ledger.create_pending_transaction(
         idempotency_key=uuid4(),
         account_id=andy,
         amount=Money(Decimal("50")),
-        prev_tx_id=new_account_tx_id,
+        prev_tx_id=andy_new_account_tx_id,
     )
 
     tx2 = ledger.create_pending_transaction(
@@ -156,39 +199,40 @@ def test_next_tx_prev_relationships_tx_are_correctly_linked(ledger, db):
         prev_tx_id=tx1,
     )
 
-    new_account_tx = ledger.session.get(Tx, new_account_tx_id)
+    andy_new_account_tx = ledger.session.get(Tx, andy_new_account_tx_id)
     t1 = ledger.session.get(Tx, tx1)
     t2 = ledger.session.get(Tx, tx2)
 
-    assert t1.prev_tx == new_account_tx
-    assert t1.prev_tx_id == new_account_tx_id
+    assert t1.prev_tx == andy_new_account_tx
+    assert t1.prev_tx_id == andy_new_account_tx_id
 
     assert t1.next_tx == t2
 
 
-def test_cannot_create_pending_transaction_if_prev_tx_id_does_not_match_the_account_id(ledger, db):
-    andy, andy_prev_tx_id = ledger.create_account("andy")
-    bill, bill_prev_tx_id = ledger.create_account("bill")
-
+def test_cannot_create_pending_transaction_if_prev_tx_id_does_not_match_the_account_id(
+    ledger,
+    db,
+    andy,
+    andy_new_account_tx_id,
+    bill,
+):
     with assert_does_not_create_any_new_tx(ledger), \
             raises(sqlalchemy.exc.IntegrityError):
         tx = ledger.create_pending_transaction(
             idempotency_key=uuid4(),
             account_id=bill,
             amount=Money(Decimal("50")),
-            prev_tx_id=andy_prev_tx_id,
+            prev_tx_id=andy_new_account_tx_id,
         )
 
 
-def test_settle_transaction(ledger, db):
-    andy, prev_tx_id = ledger.create_account("andy")
-
+def test_settle_transaction(ledger, db, andy, andy_new_account_tx_id):
     pending_tx_idempotency_key = uuid4()
     pending_tx = ledger.create_pending_transaction(
         idempotency_key=pending_tx_idempotency_key,
         account_id=andy,
         amount=Money(Decimal("50")),
-        prev_tx_id=prev_tx_id,
+        prev_tx_id=andy_new_account_tx_id,
     )
 
     settlement_tx_idempotency_key = uuid4()
@@ -215,16 +259,17 @@ def test_settle_transaction(ledger, db):
     )
 
 
-
-def test_list_transactions(ledger, db):
-    andy, andy_prev_tx_id = ledger.create_account("andy")
-    bill, bill_prev_tx_id = ledger.create_account("bill")
-
+def test_list_transactions(
+    ledger,
+    db,
+    andy, andy_new_account_tx_id,
+    bill, bill_new_account_tx_id,
+):
     tx1 = ledger.create_pending_transaction(
         idempotency_key=uuid4(),
         account_id=andy,
         amount=Money(Decimal("50")),
-        prev_tx_id=andy_prev_tx_id,
+        prev_tx_id=andy_new_account_tx_id,
     )
 
     tx2 = ledger.create_pending_transaction(
@@ -244,7 +289,7 @@ def test_list_transactions(ledger, db):
         idempotency_key=uuid4(),
         account_id=bill,
         amount=Money(Decimal("70")),
-        prev_tx_id=bill_prev_tx_id,
+        prev_tx_id=bill_new_account_tx_id,
     )
 
     txs = ledger.list_transactions(account_id=andy)
