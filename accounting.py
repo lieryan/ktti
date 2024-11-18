@@ -159,11 +159,19 @@ class Ledger(AutocommitSessionTransaction):
         self,
         account_id: AccountId,
     ) -> list[Tx]:
-        return list(
+        results = list(
             self.session.execute(
                 select(Tx).where(Tx.account_id == account_id)
             ).scalars()
         )
+        new_account_tx, = (tx for tx in results if tx.type == TxType.NEW_ACCOUNT)
+
+        def iterate_sorted_chain(it):
+            while it:
+                yield it
+                it = it.next_tx
+
+        return list(iterate_sorted_chain(new_account_tx))
 
     def get_latest_transaction(
         self,
