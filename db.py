@@ -41,7 +41,8 @@ class TxType(Enum):
 class Tx(Base):
     __tablename__ = "tx"
     __table_args__ = (
-        # this constraint enforces that all linked relationship belongs to the same account
+        # all relationship linked through prev_tx_id must belong to the same
+        # account
         ForeignKeyConstraint(
             [
                 "prev_tx_id",
@@ -54,8 +55,10 @@ class Tx(Base):
         ),
         UniqueConstraint("id", "account_id"),
 
-        # this constraint enforces that prev_current_balance and
-        # prev_available_balance are copied exactly from their prev_tx
+        # prev_current_balance and prev_available_balance are
+        # denormalized/duplicated correctly from their prev_tx
+        # these are done so we can let the database enforce check constraint
+        # against the previous tx balances
         ForeignKeyConstraint(
             [
                 "prev_tx_id",
@@ -70,14 +73,15 @@ class Tx(Base):
         ),
         UniqueConstraint("id", "current_balance", "available_balance"),
 
-        # this unique index/constraints that you can only have one NEW_ACCOUNT
-        # transaction for each account
+        # don't allow more than one one NEW_ACCOUNT transaction for each Account
         Index("tx_only_one_new_account_tx_per_account_id", "account_id", unique=True, postgresql_where="type = 'NEW_ACCOUNT'"),
 
         # only NEW_ACCOUNT transaction can have empty prev_tx_id
         CheckConstraint("type = 'NEW_ACCOUNT' OR prev_tx_id IS NOT NULL", name="tx_require_prev_tx_id"),
 
-        # these constraints ensures that balances never go negative
+        # balances should never go negative, the prev_* balance does not
+        # require their own constraint since they are always checked against by
+        # foreign key constraint
         CheckConstraint("current_balance >= 0", name="tx_positive_current_balance"),
         CheckConstraint("available_balance >= 0", name="tx_positive_available_balance"),
     )
