@@ -68,6 +68,7 @@ class Ledger(AutocommitSessionTransaction):
                 account_id=obj.id,
                 type=TxType.NEW_ACCOUNT,
                 amount=Money(Decimal(0)),
+                group_tx_id=None,
                 prev_tx_id=None,
                 prev_current_balance=Money(Decimal(0)),
                 prev_available_balance=Money(Decimal(0)),
@@ -97,7 +98,7 @@ class Ledger(AutocommitSessionTransaction):
             if obj.is_credit:
                 obj.available_balance += amount
             obj._set_transaction_hash()
-            obj.original_tx_id = obj.id
+            obj.group_tx_id = obj.id
 
             self.session.add(obj)
             self.session.flush()
@@ -106,22 +107,22 @@ class Ledger(AutocommitSessionTransaction):
     def settle_transaction(
         self,
         idempotency_key: UUID,
-        original_tx_id: TransactionId,
+        group_tx_id: TransactionId,
         prev_tx_id: Optional[TransactionId] = None,
     ):
         """
         Reflect the transaction amount to the current balance, if
-        original_tx_id already have a settled Tx, do nothing.
+        group_tx_id already have a settled Tx, do nothing.
         """
         with self:
-            original_tx = self.session.get(Tx, original_tx_id)
-            if original_tx.type != TxType.PENDING:
-                raise ValueError("original_tx must be pending transaction")
-            settled_amount = original_tx.amount  # TODO: calculate settled amount
+            group_tx = self.session.get(Tx, group_tx_id)
+            if group_tx.type != TxType.PENDING:
+                raise ValueError("group_tx must be the pending transaction of the group")
+            settled_amount = group_tx.amount  # TODO: calculate settled amount
             obj = Tx(
                 idempotency_key=idempotency_key,
-                account_id=original_tx.account_id,
-                original_tx_id=original_tx_id,
+                account_id=group_tx.account_id,
+                group_tx_id=group_tx_id,
                 type=TxType.SETTLEMENT,
                 amount=settled_amount,
             )
@@ -137,21 +138,21 @@ class Ledger(AutocommitSessionTransaction):
     def refund_pending_transaction(
         self,
         idempotency_key: UUID,
-        original_tx_id: TransactionId,
+        group_tx_id: TransactionId,
         amount: Optional[Money],
         prev_tx_id: Optional[TransactionId] = None,
     ):
         """If `amount` is provided, do a partial refund."""
         assert amount, "automatic determination of amount is not yet supported"
         with self:
-            original_tx = self.session.get(Tx, original_tx_id)
-            if original_tx.is_debit:
+            group_tx = self.session.get(Tx, group_tx_id)
+            if group_tx.is_debit:
                 raise ValueError("Can only refund credit transaction.")
 
             obj = Tx(
                 idempotency_key=idempotency_key,
-                account_id=original_tx.account_id,
-                original_tx_id=original_tx_id,
+                account_id=group_tx.account_id,
+                group_tx_id=group_tx_id,
                 type=TxType.REFUND,
                 amount=amount,
             )

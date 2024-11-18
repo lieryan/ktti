@@ -64,7 +64,7 @@ def andy_account_balance_is_100(ledger, db, andy, andy_new_account_tx_id):
     )
     settlement_tx_id = ledger.settle_transaction(
         idempotency_key=uuid4(),
-        original_tx_id=debit_tx_id,
+        group_tx_id=debit_tx_id,
         prev_tx_id=debit_tx_id,
     )
 
@@ -160,6 +160,7 @@ def test_cannot_create_new_account_transaction_for_the_same_account(ledger, db):
                 account_id=andy,
                 type=TxType.NEW_ACCOUNT,
                 amount=Money(Decimal(0)),
+                group_tx_id=None,
                 prev_tx_id=None,
                 prev_current_balance=Money(Decimal(0)),
                 prev_available_balance=Money(Decimal(0)),
@@ -188,7 +189,7 @@ def test_create_pending_transaction_debit(
     assert is_sha256_bytes(obj.id)
     assert obj.idempotency_key == idempotency_key
     assert obj.account.id == andy
-    assert tx is not None and obj.original_tx_id == tx, "The original_tx of the pending Tx is the pending Tx itself"
+    assert tx is not None and obj.group_tx_id == tx, "The original_tx of the pending Tx is the pending Tx itself"
     assert obj.type == TxType.PENDING
     assert obj.amount == Money(Decimal("50"))
 
@@ -221,7 +222,7 @@ def test_create_pending_transaction_credit(
     assert is_sha256_bytes(obj.id)
     assert obj.idempotency_key == idempotency_key
     assert obj.account.id == andy
-    assert pending_tx is not None and obj.original_tx_id == pending_tx, "The original_tx of the pending Tx is the pending Tx itself"
+    assert pending_tx is not None and obj.group_tx_id == pending_tx, "The original_tx of the pending Tx is the pending Tx itself"
     assert obj.type == TxType.PENDING
     assert obj.amount == Money(Decimal("-50"))
 
@@ -365,7 +366,7 @@ def test_settle_transaction(ledger, db, andy, andy_new_account_tx_id):
     settlement_tx_idempotency_key = uuid4()
     settlement_tx = ledger.settle_transaction(
         idempotency_key=settlement_tx_idempotency_key,
-        original_tx_id=pending_tx,
+        group_tx_id=pending_tx,
         prev_tx_id=pending_tx,
     )
 
@@ -373,7 +374,7 @@ def test_settle_transaction(ledger, db, andy, andy_new_account_tx_id):
     assert is_sha256_bytes(obj.id)
     assert obj.idempotency_key == settlement_tx_idempotency_key
     assert obj.account.id == andy
-    assert obj.original_tx_id == pending_tx
+    assert obj.group_tx_id == pending_tx
     assert obj.type == TxType.SETTLEMENT
     assert obj.amount == Money(Decimal("50"))
 
@@ -397,7 +398,7 @@ def test_setting_prev_tx_balances_when_creating_and_settling_transactions(ledger
 
     tx2 = ledger.settle_transaction(
         idempotency_key=uuid4(),
-        original_tx_id=tx1,
+        group_tx_id=tx1,
         prev_tx_id=tx1,
     )
 
@@ -410,7 +411,7 @@ def test_setting_prev_tx_balances_when_creating_and_settling_transactions(ledger
 
     tx4 = ledger.settle_transaction(
         idempotency_key=uuid4(),
-        original_tx_id=tx3,
+        group_tx_id=tx3,
         prev_tx_id=tx3,
     )
 
@@ -465,7 +466,7 @@ def test_refund_pending_debit_transaction(
             raises(ValueError, match="Can only refund credit transaction."):
         refund_tx = ledger.refund_pending_transaction(
             idempotency_key=uuid4(),
-            original_tx_id=debit_tx,
+            group_tx_id=debit_tx,
             amount=Money(Decimal("20")),
         )
 
@@ -485,14 +486,14 @@ def test_refund_pending_credit_transaction(
 
     refund_tx = ledger.refund_pending_transaction(
         idempotency_key=uuid4(),
-        original_tx_id=credit_tx,
+        group_tx_id=credit_tx,
         amount=Money(Decimal("20")),
         prev_tx_id=credit_tx,
     )
 
     settlement_tx = ledger.settle_transaction(
         idempotency_key=uuid4(),
-        original_tx_id=credit_tx,
+        group_tx_id=credit_tx,
         prev_tx_id=refund_tx,
     )
 
@@ -543,7 +544,7 @@ def test_list_transactions(
 
     settlement_tx = ledger.settle_transaction(
         idempotency_key=uuid4(),
-        original_tx_id=tx1,
+        group_tx_id=tx1,
         prev_tx_id=tx2,
     )
 
@@ -592,7 +593,7 @@ def test_get_latest_transaction(
 
     tx3 = ledger.settle_transaction(
         idempotency_key=uuid4(),
-        original_tx_id=tx1,
+        group_tx_id=tx1,
         prev_tx_id=tx2,
     )
 

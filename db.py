@@ -42,7 +42,7 @@ class TxType(Enum):
 class Tx(Base):
     __tablename__ = "tx"
     __table_args__ = (
-        # Tx with the same original_tx_id forms a Tx group that consists of
+        # Tx with the same group_tx_id forms a Tx group that consists of
         #
         # - exactly one pending transaction
         # - one or more refund transactions
@@ -52,7 +52,7 @@ class Tx(Base):
         ForeignKeyConstraint(
             [
                 "account_id",
-                "original_tx_id",
+                "group_tx_id",
             ],
             [
                 "tx.account_id",
@@ -119,9 +119,9 @@ class Tx(Base):
     type: Mapped[TxType]
     amount: Mapped[Decimal]
 
-    # For refunds and settlements, the original_tx_id points to the pending
+    # For refunds and settlements, the group_tx_id points to the pending
     # transaction event
-    original_tx_id: Mapped[Optional[bytes]] = mapped_column(
+    group_tx_id: Mapped[Optional[bytes]] = mapped_column(
         BYTEA(32),
         nullable=True,
     )
