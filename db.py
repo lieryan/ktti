@@ -163,6 +163,10 @@ class Tx(Base):
         assert self.id is None
         self.id = self.tx_hash
 
+    def _set_group_root(self) -> None:
+        self.group_tx_id = self.id
+        self.group_prev_tx_id = None
+        
     @property
     def tx_hash(self) -> bytes:
         # adding prev_tx_id into the hashed data means that alterations to

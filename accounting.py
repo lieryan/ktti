@@ -69,6 +69,7 @@ class Ledger(AutocommitSessionTransaction):
                 type=TxType.NEW_ACCOUNT,
                 amount=Money(Decimal(0)),
                 group_tx_id=None,
+                group_prev_tx_id=None,
                 prev_tx_id=None,
                 prev_current_balance=Money(Decimal(0)),
                 prev_available_balance=Money(Decimal(0)),

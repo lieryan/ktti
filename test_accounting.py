@@ -189,7 +189,6 @@ def test_create_pending_transaction_debit(
     assert is_sha256_bytes(obj.id)
     assert obj.idempotency_key == idempotency_key
     assert obj.account.id == andy
-    assert tx is not None and obj.group_tx_id == tx, "The original_tx of the pending Tx is the pending Tx itself"
     assert obj.type == TxType.PENDING
     assert obj.amount == Money(Decimal("50"))
 
@@ -201,6 +200,9 @@ def test_create_pending_transaction_debit(
         prev_current_balance=Money(Decimal(0)),
         prev_available_balance=Money(Decimal(0)),
     )
+
+    assert tx is not None and obj.group_tx_id == tx, "The group_tx of the pending Tx is the pending Tx itself"
+    assert obj.group_prev_tx_id is None
 
 
 def test_create_pending_transaction_credit(
@@ -222,7 +224,6 @@ def test_create_pending_transaction_credit(
     assert is_sha256_bytes(obj.id)
     assert obj.idempotency_key == idempotency_key
     assert obj.account.id == andy
-    assert pending_tx is not None and obj.group_tx_id == pending_tx, "The original_tx of the pending Tx is the pending Tx itself"
     assert obj.type == TxType.PENDING
     assert obj.amount == Money(Decimal("-50"))
 
@@ -234,6 +235,9 @@ def test_create_pending_transaction_credit(
         prev_current_balance=Money(Decimal(100)),
         prev_available_balance=Money(Decimal(100)),
     )
+
+    assert pending_tx is not None and obj.group_tx_id == pending_tx, "The group_tx of the pending Tx is the pending Tx itself"
+    assert obj.group_prev_tx_id is None
 
 
 def test_create_pending_transaction_credit_insufficient_fund(
@@ -283,7 +287,7 @@ def test_cannot_create_transaction_with_duplicate_idempotency_key(
         )
 
 
-def test_next_tx_prev_relationships_tx_are_correctly_linked(
+def test_next_tx_prev_tx_relationships_are_correctly_linked(
     ledger,
     db,
     andy,
@@ -311,6 +315,63 @@ def test_next_tx_prev_relationships_tx_are_correctly_linked(
     assert t1.prev_tx_id == andy_new_account_tx_id
 
     assert t1.next_tx == t2
+
+
+def test_group_next_tx_group_prev_tx_relationships_are_correctly_linked(
+    ledger,
+    db,
+    andy,
+    andy_new_account_tx_id,
+    andy_account_balance_is_100,
+):
+    tx1 = ledger.create_pending_transaction(
+        idempotency_key=uuid4(),
+        account_id=andy,
+        amount=Money(Decimal("-50")),
+        prev_tx_id=andy_account_balance_is_100,
+    )
+
+    tx2 = ledger.refund_pending_transaction(
+        idempotency_key=uuid4(),
+        group_tx_id=tx1,
+        amount=Money(Decimal("10")),
+        prev_tx_id=tx1,
+    )
+
+    tx3 = ledger.create_pending_transaction(
+        idempotency_key=uuid4(),
+        account_id=andy,
+        amount=Money(Decimal("20")),
+        prev_tx_id=tx2,
+    )
+
+    tx4 = ledger.refund_pending_transaction(
+        idempotency_key=uuid4(),
+        group_tx_id=tx1,
+        amount=Money(Decimal("30")),
+        prev_tx_id=tx3,
+    )
+
+    andy_new_account_tx = ledger.session.get(Tx, andy_new_account_tx_id)
+    t1 = ledger.session.get(Tx, tx1)
+    t2 = ledger.session.get(Tx, tx2)
+    t3 = ledger.session.get(Tx, tx3)
+    t4 = ledger.session.get(Tx, tx4)
+
+    assert t2.prev_tx == t1
+    assert t2.prev_tx_id == tx1
+
+    assert t2.next_tx == t3
+
+    assert t1.group_tx_id == tx1
+    assert t2.group_tx_id == tx1
+    assert t3.group_tx_id == t3.id
+    assert t4.group_tx_id == tx1
+
+    assert t2.group_prev_tx == t1
+    assert t2.group_prev_tx_id == tx1
+
+    assert t2.group_next_tx == t4
 
 
 def test_cannot_create_pending_transaction_if_prev_tx_id_does_not_match_the_account_id(
