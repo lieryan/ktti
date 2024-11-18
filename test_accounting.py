@@ -166,6 +166,20 @@ def test_next_tx_prev_relationships_tx_are_correctly_linked(ledger, db):
     assert t1.next_tx == t2
 
 
+def test_cannot_create_pending_transaction_if_prev_tx_id_does_not_match_the_account_id(ledger, db):
+    andy, andy_prev_tx_id = ledger.create_account("andy")
+    bill, bill_prev_tx_id = ledger.create_account("bill")
+
+    with assert_does_not_create_any_new_tx(ledger), \
+            raises(sqlalchemy.exc.IntegrityError):
+        tx = ledger.create_pending_transaction(
+            idempotency_key=uuid4(),
+            account_id=bill,
+            amount=Money(Decimal("50")),
+            prev_tx_id=andy_prev_tx_id,
+        )
+
+
 def test_settle_transaction(ledger, db):
     andy, prev_tx_id = ledger.create_account("andy")
 

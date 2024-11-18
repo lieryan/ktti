@@ -39,6 +39,21 @@ class TxType(Enum):
 class Tx(Base):
     __tablename__ = "tx"
     __table_args__ = (
+        # this constraint enforces that all linked relationship belongs to the same account
+        ForeignKeyConstraint(
+            [
+                "prev_tx_id",
+                "account_id",
+            ],
+            [
+                "tx.id",
+                "tx.account_id",
+            ],
+        ),
+        UniqueConstraint("id", "account_id"),
+
+        # this constraint enforces that prev_current_balance and
+        # prev_available_balance are copied exactly from their prev_tx
         ForeignKeyConstraint(
             [
                 "prev_tx_id",
@@ -69,8 +84,17 @@ class Tx(Base):
     current_balance: Mapped[Decimal]
     available_balance: Mapped[Decimal]
 
-    next_tx: Mapped[Optional["Tx"]] = relationship(back_populates="prev_tx", foreign_keys=[prev_tx_id])
-    prev_tx: Mapped[Optional["Tx"]] = relationship(back_populates="next_tx", remote_side=[id], foreign_keys=[prev_tx_id])
+    next_tx: Mapped[Optional["Tx"]] = relationship(
+        back_populates="prev_tx",
+        viewonly=True,
+        foreign_keys=[prev_tx_id, account_id],
+    )
+    prev_tx: Mapped[Optional["Tx"]] = relationship(
+        back_populates="next_tx",
+        viewonly=True,
+        remote_side=[id],
+        foreign_keys=[prev_tx_id, account_id],
+    )
 
     def _set_transaction_hash(self) -> None:
         assert self.id is None
