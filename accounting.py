@@ -119,6 +119,8 @@ class Ledger(AutocommitSessionTransaction):
         with self:
             prev_tx = self.session.get(Tx, prev_tx_id)
             original_tx = self.session.get(Tx, original_tx_id)
+            if original_tx.type != TxType.PENDING:
+                raise ValueError("original_tx must be pending transaction")
             settled_amount = original_tx.amount  # TODO: calculate settled amount
             obj = Tx(
                 idempotency_key=idempotency_key,
