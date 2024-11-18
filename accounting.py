@@ -137,10 +137,32 @@ class Ledger(AutocommitSessionTransaction):
     def refund_pending_transaction(
         self,
         idempotency_key: UUID,
+        original_tx_id: TransactionId,
         amount: Optional[Money],
+        prev_tx_id: Optional[TransactionId] = None,
     ):
-        """When `amount` is provided, do a partial refund."""
-        pass
+        """If `amount` is provided, do a partial refund."""
+        assert amount, "automatic determination of amount is not yet supported"
+        with self:
+            original_tx = self.session.get(Tx, original_tx_id)
+            if original_tx.is_debit:
+                raise ValueError("Can only refund credit transaction.")
+
+            obj = Tx(
+                idempotency_key=idempotency_key,
+                account_id=original_tx.account_id,
+                original_tx_id=original_tx_id,
+                type=TxType.REFUND,
+                amount=amount,
+            )
+            obj._set_prev_tx(self.session.get(Tx, prev_tx_id))
+            obj.available_balance += amount
+            obj._set_transaction_hash()
+
+            self.session.add(obj)
+            self.session.flush()
+            return TransactionId(obj.id)
+
 
     def get_balance(
         self,

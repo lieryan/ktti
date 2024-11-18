@@ -35,13 +35,36 @@ class Account(Base):
 class TxType(Enum):
     NEW_ACCOUNT = "n"
     PENDING = "p"
+    REFUND = "r"
     SETTLEMENT = "s"
 
 
 class Tx(Base):
     __tablename__ = "tx"
     __table_args__ = (
-        # all relationship linked through prev_tx_id must belong to the same
+        # Tx with the same original_tx_id forms a Tx group that consists of
+        #
+        # - exactly one pending transaction
+        # - one or more refund transactions
+        # - at most one settlement transaction
+        #
+        # All Tx in the group must belong to the same account
+        ForeignKeyConstraint(
+            [
+                "account_id",
+                "original_tx_id",
+            ],
+            [
+                "tx.account_id",
+                "tx.id",
+            ],
+        ),
+        # TODO: add a constraint/trigger to check that the original tx must be
+        #       a pending Tx
+
+        # prev_tx_id forms a chain of Tx that are in sequential order of
+        # event processing.
+        # all Tx related through prev_tx_id chain must belong to the same
         # account
         ForeignKeyConstraint(
             [
@@ -149,6 +172,16 @@ class Tx(Base):
         tx_hash = sha256(data.encode("ascii")).digest()
         assert self.id is None or self.id == tx_hash
         return tx_hash
+
+    @property
+    def is_debit(self):
+        assert self.type == TxType.PENDING
+        return self.amount > 0
+
+    @property
+    def is_credit(self):
+        assert self.type == TxType.PENDING
+        return self.amount < 0
 
     def __repr__(self) -> str:
         return f"<Tx {self.tx_hash.hex()} {self.type.name} account={self.account.name if self.account else self.account_id} amount={self.amount}>"
