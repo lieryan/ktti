@@ -99,7 +99,7 @@ class Ledger(AutocommitSessionTransaction):
             if obj.is_credit:
                 obj.available_balance += amount
             obj._set_transaction_hash()
-            obj.group_tx_id = obj.id
+            obj._set_group_tx_root()
 
             self.session.add(obj)
             self.session.flush()
@@ -117,17 +117,15 @@ class Ledger(AutocommitSessionTransaction):
         """
         with self:
             group_tx = self.session.get(Tx, group_tx_id)
-            if group_tx.type != TxType.PENDING:
-                raise ValueError("group_tx must be the pending transaction of the group")
             settled_amount = group_tx.amount  # TODO: calculate settled amount
             obj = Tx(
                 idempotency_key=idempotency_key,
                 account_id=group_tx.account_id,
-                group_tx_id=group_tx_id,
                 type=TxType.SETTLEMENT,
                 amount=settled_amount,
             )
             obj._set_prev_tx(self.session.get(Tx, prev_tx_id))
+            self._add_to_group(obj, group_tx)
             obj.current_balance += settled_amount
             obj.available_balance += settled_amount
             obj._set_transaction_hash()
@@ -135,6 +133,15 @@ class Ledger(AutocommitSessionTransaction):
             self.session.add(obj)
             self.session.flush()
             return TransactionId(obj.id)
+
+    def _add_to_group(self, obj, group_tx):
+        group_tx = self.session.get(Tx, group_tx.id)
+        if group_tx.type != TxType.PENDING:
+            raise ValueError("group_tx must be the pending transaction of the group")
+
+        group_latest_tx_id = self.get_latest_group_transaction(group_tx.id)
+        obj.group_tx_id = group_tx.id
+        obj.group_prev_tx_id = group_latest_tx_id
 
     def refund_pending_transaction(
         self,
@@ -153,11 +160,12 @@ class Ledger(AutocommitSessionTransaction):
             obj = Tx(
                 idempotency_key=idempotency_key,
                 account_id=group_tx.account_id,
-                group_tx_id=group_tx_id,
                 type=TxType.REFUND,
                 amount=amount,
+                pending_amount=amount,
             )
             obj._set_prev_tx(self.session.get(Tx, prev_tx_id))
+            self._add_to_group(obj, group_tx)
             obj.available_balance += amount
             obj._set_transaction_hash()
 
@@ -202,11 +210,26 @@ class Ledger(AutocommitSessionTransaction):
         #        slow if there's a lot of transactions in the account.
         #        We would need to record the head of the log in the accounts
         #        table to optimize this lookup.
-        with self:
-            tx_ids = set(self.session.execute(select(Tx.id).where(Tx.account_id == account_id)).scalars())
-            prev_tx_ids = set(self.session.execute(select(Tx.prev_tx_id).where(Tx.account_id == account_id)).scalars())
-            latest_tx, = tx_ids - prev_tx_ids
-            return latest_tx
+        tx_ids = set(self.session.execute(select(Tx.id).where(Tx.account_id == account_id)).scalars())
+        prev_tx_ids = set(self.session.execute(select(Tx.prev_tx_id).where(Tx.account_id == account_id)).scalars())
+        latest_tx, = tx_ids - prev_tx_ids
+        return latest_tx
+
+    def get_latest_group_transaction(
+        self,
+        group_tx_id: TransactionId,
+    ):
+        """Find the Tx in the Tx group that is never referenced by other
+        Tx.group_prev_tx_id, this is always the latest Tx for that group"""
+        # FIXME: Calculating the head of the transactions in this way can be
+        #        slow if there's a lot of transactions in the account.
+        #        We would need to record the head of the log in the accounts
+        #        table to optimize this lookup.
+        assert self.session.get(Tx, group_tx_id).type == TxType.PENDING
+        tx_ids = set(self.session.execute(select(Tx.id).where(Tx.group_tx_id == group_tx_id)).scalars())
+        prev_tx_ids = set(self.session.execute(select(Tx.group_prev_tx_id).where(Tx.group_tx_id == group_tx_id)).scalars())
+        latest_tx, = tx_ids - prev_tx_ids
+        return latest_tx
 
     ### UI
 

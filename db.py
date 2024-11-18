@@ -72,11 +72,18 @@ class Tx(Base):
             [
                 "account_id",
                 "group_tx_id",
+                "group_prev_tx_id",
             ],
             [
                 "tx.account_id",
+                "tx.group_tx_id",
                 "tx.id",
             ],
+        ),
+        UniqueConstraint(
+            "account_id",
+            "group_tx_id",
+            "id",
         ),
         # TODO: add a constraint/trigger to check that the original tx must be
         #       a pending Tx
@@ -105,6 +112,9 @@ class Tx(Base):
         # only NEW_ACCOUNT transaction can have empty prev_tx_id
         CheckConstraint("type = 'NEW_ACCOUNT' OR prev_tx_id IS NOT NULL", name="tx_require_prev_tx_id"),
 
+        # only NEW_ACCOUNT and PENDING transaction can have empty group_prev_tx_id
+        CheckConstraint("type = 'NEW_ACCOUNT' or type = 'PENDING' OR group_prev_tx_id IS NOT NULL", name="tx_require_group_prev_tx_id"),
+
         # balances should never go negative, the prev_* balance does not
         # require their own constraint since they are always checked against by
         # foreign key constraint
@@ -124,6 +134,21 @@ class Tx(Base):
     group_tx_id: Mapped[Optional[bytes]] = mapped_column(
         BYTEA(32),
         nullable=True,
+    )
+    group_prev_tx_id: Mapped[Optional[bytes]] = mapped_column(
+        BYTEA(32),
+        nullable=True,
+    )
+    group_next_tx: Mapped[Optional["Tx"]] = relationship(
+        back_populates="group_prev_tx",
+        viewonly=True,
+        foreign_keys=[account_id, group_tx_id, group_prev_tx_id],
+    )
+    group_prev_tx: Mapped[Optional["Tx"]] = relationship(
+        back_populates="group_next_tx",
+        viewonly=True,
+        remote_side=[id],
+        foreign_keys=[account_id, group_tx_id, group_prev_tx_id],
     )
 
     # `prev_tx_id` causes Tx to form a linked list chain that defines the
@@ -163,7 +188,7 @@ class Tx(Base):
         assert self.id is None
         self.id = self.tx_hash
 
-    def _set_group_root(self) -> None:
+    def _set_group_tx_root(self) -> None:
         self.group_tx_id = self.id
         self.group_prev_tx_id = None
         

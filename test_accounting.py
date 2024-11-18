@@ -352,11 +352,18 @@ def test_group_next_tx_group_prev_tx_relationships_are_correctly_linked(
         prev_tx_id=tx3,
     )
 
+    tx5 = ledger.settle_transaction(
+        idempotency_key=uuid4(),
+        group_tx_id=tx1,
+        prev_tx_id=tx4,
+    )
+
     andy_new_account_tx = ledger.session.get(Tx, andy_new_account_tx_id)
     t1 = ledger.session.get(Tx, tx1)
     t2 = ledger.session.get(Tx, tx2)
     t3 = ledger.session.get(Tx, tx3)
     t4 = ledger.session.get(Tx, tx4)
+    t5 = ledger.session.get(Tx, tx5)
 
     assert t2.prev_tx == t1
     assert t2.prev_tx_id == tx1
