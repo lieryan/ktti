@@ -139,6 +139,33 @@ def test_cannot_create_transaction_with_duplicate_idempotency_key(ledger, db):
         )
 
 
+def test_next_tx_prev_relationships_tx_are_correctly_linked(ledger, db):
+    andy, new_account_tx_id = ledger.create_account("andy")
+
+    tx1 = ledger.create_pending_transaction(
+        idempotency_key=uuid4(),
+        account_id=andy,
+        amount=Money(Decimal("50")),
+        prev_tx_id=new_account_tx_id,
+    )
+
+    tx2 = ledger.create_pending_transaction(
+        idempotency_key=uuid4(),
+        account_id=andy,
+        amount=Money(Decimal("50")),
+        prev_tx_id=tx1,
+    )
+
+    new_account_tx = ledger.session.get(Tx, new_account_tx_id)
+    t1 = ledger.session.get(Tx, tx1)
+    t2 = ledger.session.get(Tx, tx2)
+
+    assert t1.prev_tx == new_account_tx
+    assert t1.prev_tx_id == new_account_tx_id
+
+    assert t1.next_tx == t2
+
+
 def test_settle_transaction(ledger, db):
     andy, prev_tx_id = ledger.create_account("andy")
 
