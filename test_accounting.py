@@ -249,6 +249,30 @@ def test_cannot_create_pending_transaction_if_prev_tx_id_does_not_match_the_acco
         )
 
 
+def test_prev_tx_id_cannot_be_empty_except_for_new_account_transaction(
+    ledger,
+    db,
+    andy,
+    andy_new_account_tx_id,
+):
+    with assert_does_not_create_any_new_tx(ledger), \
+            raises(sqlalchemy.exc.IntegrityError, match='new row for relation "tx" violates check constraint "tx_require_prev_tx_id"'):
+        with ledger:
+            new_tx = Tx(
+                idempotency_key=uuid4(),
+                account_id=andy,
+                type=TxType.PENDING,
+                amount=Money(Decimal(0)),
+                prev_tx_id=None,
+                prev_current_balance=Money(Decimal(0)),
+                prev_available_balance=Money(Decimal(0)),
+                current_balance=Money(Decimal(0)),
+                available_balance=Money(Decimal(0)),
+            )
+            new_tx._set_transaction_hash()
+            ledger.session.add(new_tx)
+
+
 def test_settle_transaction(ledger, db, andy, andy_new_account_tx_id):
     pending_tx_idempotency_key = uuid4()
     pending_tx = ledger.create_pending_transaction(
