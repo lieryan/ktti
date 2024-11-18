@@ -1,10 +1,11 @@
 from decimal import Decimal
 from typing import Any
+from contextlib import contextmanager
 from uuid import UUID, uuid4
 
 import sqlalchemy
 from pytest import fixture, raises
-from sqlalchemy import create_engine, text, select
+from sqlalchemy import create_engine, text, select, func
 
 import accounting
 from accounting import Money
@@ -13,7 +14,9 @@ from db import create_tables, Account, Tx, TxType
 
 @fixture
 def engine():
-    return create_engine("postgresql+psycopg://postgres:password@localhost:5432/postgres")
+    return create_engine(
+        "postgresql+psycopg://postgres:password@localhost:5432/postgres"
+    )
 
 
 @fixture
@@ -33,6 +36,16 @@ def db(engine):
 
 def is_sha256_bytes(value: Any) -> bool:
     return isinstance(value, bytes) and len(value) == 32
+
+
+@contextmanager
+def assert_does_not_create_any_new_tx(ledger):
+    with ledger:
+        start_count = ledger.session.execute(select(func.count(Tx.id))).scalar_one()
+    yield
+    with ledger:
+        end_count = ledger.session.execute(select(func.count(Tx.id))).scalar_one()
+    assert start_count == end_count
 
 
 def assert_tx_balances(
@@ -73,7 +86,8 @@ def test_create_account(ledger, db):
 def test_cannot_create_two_accounts_with_the_same_name(ledger, db):
     andy, prev_tx_id = ledger.create_account("andy")
 
-    with raises(sqlalchemy.exc.IntegrityError):
+    with assert_does_not_create_any_new_tx(ledger), \
+            raises(sqlalchemy.exc.IntegrityError):
         ledger.create_account("andy")
 
 
@@ -115,7 +129,8 @@ def test_cannot_create_transaction_with_duplicate_idempotency_key(ledger, db):
         amount=Money(Decimal("50")),
         prev_tx_id=prev_tx_id,
     )
-    with raises(sqlalchemy.exc.IntegrityError):
+    with assert_does_not_create_any_new_tx(ledger), \
+            raises(sqlalchemy.exc.IntegrityError):
         tx = ledger.create_pending_transaction(
             idempotency_key=idempotency_key,
             account_id=andy,

@@ -5,7 +5,13 @@ from uuid import UUID, uuid4
 from typing import Optional
 
 import sqlalchemy
-from sqlalchemy import create_engine, String, ForeignKey, ForeignKeyConstraint, UniqueConstraint
+from sqlalchemy import (
+    create_engine,
+    String,
+    ForeignKey,
+    ForeignKeyConstraint,
+    UniqueConstraint,
+)
 from sqlalchemy.dialects.postgresql import BYTEA
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -21,9 +27,8 @@ class Account(Base):
     name: Mapped[str] = mapped_column(String(30), unique=True)
 
     def __repr__(self) -> str:
-        return (
-            f"<Account {self.id} name={self.name}>"
-        )
+        return f"<Account {self.id} name={self.name}>"
+
 
 class TxType(Enum):
     NEW_ACCOUNT = "n"
@@ -64,9 +69,7 @@ class Tx(Base):
         return tx_hash
 
     def __repr__(self) -> str:
-        return (
-            f"<Tx {self.tx_hash.hex()} {self.type.name} account={self.account.name if self.account else self.account_id} amount={self.amount}>"
-        )
+        return f"<Tx {self.tx_hash.hex()} {self.type.name} account={self.account.name if self.account else self.account_id} amount={self.amount}>"
 
 
 def connect():
