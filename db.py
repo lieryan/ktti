@@ -42,8 +42,8 @@ class TxType(Enum):
 class Tx(Base):
     __tablename__ = "tx"
     __table_args__ = (
-        # prev_tx_id forms a chain of Tx that are in sequential order of
-        # event processing.
+        # prev_tx_id forms a chain of Tx that are in the order of their
+        # transaction requests received or processed by the ledger.
         # all Tx related through prev_tx_id chain must belong to the same
         # account
         ForeignKeyConstraint(
@@ -67,7 +67,10 @@ class Tx(Base):
         # - one or more refund transactions
         # - at most one settlement transaction
         #
-        # All Tx in the group must belong to the same account
+        # The settlement tx of a group closes the group from further
+        # alterations.
+        #
+        # All Tx in the group must belong to the same account.
         ForeignKeyConstraint(
             [
                 "account_id",
@@ -88,10 +91,24 @@ class Tx(Base):
         # TODO: add a constraint/trigger to check that the original tx must be
         #       a pending Tx
 
-        # prev_current_balance and prev_available_balance are
-        # denormalized/duplicated correctly from their prev_tx
-        # these are done so we can let the database enforce check constraint
-        # against the previous tx balances
+        # enforce that original_tx_pending_amount are correctly
+        # denormalized/duplicated through group_tx_id chain
+        ForeignKeyConstraint(
+            [
+                "group_prev_tx_id",
+                "group_prev_pending_amount",
+            ],
+            [
+                "tx.id",
+                "tx.pending_amount",
+            ],
+        ),
+        UniqueConstraint("id", "pending_amount"),
+
+        # enforce that prev_current_balance and prev_available_balance are
+        # denormalized/duplicated correctly from their prev_tx these are done
+        # so we can let the database enforce check constraint against the
+        # previous tx balances
         ForeignKeyConstraint(
             [
                 "prev_tx_id",
@@ -128,6 +145,7 @@ class Tx(Base):
     account: Mapped[Account] = relationship()
     type: Mapped[TxType]
     amount: Mapped[Decimal]
+    pending_amount: Mapped[Decimal]
 
     # For refunds and settlements, the group_tx_id points to the pending
     # transaction event
@@ -150,6 +168,7 @@ class Tx(Base):
         remote_side=[id],
         foreign_keys=[account_id, group_tx_id, group_prev_tx_id],
     )
+    group_prev_pending_amount: Mapped[Decimal]
 
     # `prev_tx_id` causes Tx to form a linked list chain that defines the
     # logical sequence of the transactions

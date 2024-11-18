@@ -68,8 +68,10 @@ class Ledger(AutocommitSessionTransaction):
                 account_id=obj.id,
                 type=TxType.NEW_ACCOUNT,
                 amount=Money(Decimal(0)),
+                pending_amount=Money(Decimal(0)),
                 group_tx_id=None,
                 group_prev_tx_id=None,
+                group_prev_pending_amount=Money(Decimal(0)),
                 prev_tx_id=None,
                 prev_current_balance=Money(Decimal(0)),
                 prev_available_balance=Money(Decimal(0)),
@@ -94,6 +96,8 @@ class Ledger(AutocommitSessionTransaction):
                 account_id=account_id,
                 type=TxType.PENDING,
                 amount=amount,
+                pending_amount=amount,
+                group_prev_pending_amount=Money(Decimal("0")),
             )
             obj._set_prev_tx(self.session.get(Tx, prev_tx_id))
             if obj.is_credit:
@@ -123,6 +127,8 @@ class Ledger(AutocommitSessionTransaction):
                 account_id=group_tx.account_id,
                 type=TxType.SETTLEMENT,
                 amount=settled_amount,
+                pending_amount=settled_amount,
+                group_prev_pending_amount=Money(Decimal(0)),
             )
             obj._set_prev_tx(self.session.get(Tx, prev_tx_id))
             self._add_to_group(obj, group_tx)
@@ -140,8 +146,10 @@ class Ledger(AutocommitSessionTransaction):
             raise ValueError("group_tx must be the pending transaction of the group")
 
         group_latest_tx_id = self.get_latest_group_transaction(group_tx.id)
+        group_latest_tx = self.session.get(Tx, group_latest_tx_id)
         obj.group_tx_id = group_tx.id
         obj.group_prev_tx_id = group_latest_tx_id
+        obj.group_prev_pending_amount = group_latest_tx.pending_amount
 
     def refund_pending_transaction(
         self,
