@@ -244,7 +244,10 @@ def test_create_pending_transaction_credit_insufficient_fund(
 ):
     idempotency_key = uuid4()
     with assert_does_not_create_any_new_tx(ledger), \
-            raises(sqlalchemy.exc.IntegrityError, match='violates check constraint "tx_positive_available_balance"'):
+            raises(
+                sqlalchemy.exc.IntegrityError,
+                match='violates check constraint "tx_positive_available_balance"',
+            ):
         pending_tx = ledger.create_pending_transaction(
             idempotency_key=idempotency_key,
             account_id=andy,
@@ -267,7 +270,10 @@ def test_cannot_create_transaction_with_duplicate_idempotency_key(
         prev_tx_id=andy_new_account_tx_id,
     )
     with assert_does_not_create_any_new_tx(ledger), \
-            raises(sqlalchemy.exc.IntegrityError):
+            raises(
+                sqlalchemy.exc.IntegrityError,
+                match='duplicate key value violates unique constraint "tx_pkey"',
+            ):
         tx = ledger.create_pending_transaction(
             idempotency_key=idempotency_key,
             account_id=andy,
@@ -314,7 +320,7 @@ def test_cannot_create_pending_transaction_if_prev_tx_id_does_not_match_the_acco
     bill,
 ):
     with assert_does_not_create_any_new_tx(ledger), \
-            raises(sqlalchemy.exc.IntegrityError):
+            raises(sqlalchemy.exc.IntegrityError, match='violates foreign key constraint "tx_account_id_prev_tx_id_fkey"'):
         tx = ledger.create_pending_transaction(
             idempotency_key=uuid4(),
             account_id=bill,
