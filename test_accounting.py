@@ -35,6 +35,20 @@ def is_sha256_bytes(value: Any) -> bool:
     return isinstance(value, bytes) and len(value) == 32
 
 
+def assert_tx_balances(
+    new_account_tx,
+    *,
+    current_balance,
+    available_balance,
+    prev_current_balance,
+    prev_available_balance,
+):
+    assert new_account_tx.current_balance == current_balance
+    assert new_account_tx.available_balance == available_balance
+    assert new_account_tx.prev_current_balance == prev_current_balance
+    assert new_account_tx.prev_available_balance == prev_available_balance
+
+
 def test_create_account(ledger, db):
     andy, prev_tx_id = ledger.create_account("andy")
 
@@ -47,8 +61,14 @@ def test_create_account(ledger, db):
     assert new_account_tx.account_id == andy
     assert new_account_tx.type == TxType.NEW_ACCOUNT
     assert new_account_tx.amount == Money(Decimal(0))
-    assert new_account_tx.current_balance == Money(Decimal(0))
-    assert new_account_tx.available_balance == Money(Decimal(0))
+    assert_tx_balances(
+        new_account_tx,
+        current_balance=Money(Decimal(0)),
+        available_balance=Money(Decimal(0)),
+        prev_current_balance=Money(Decimal(0)),
+        prev_available_balance=Money(Decimal(0)),
+    )
+
 
 def test_cannot_create_two_accounts_with_the_same_name(ledger, db):
     andy, prev_tx_id = ledger.create_account("andy")
@@ -76,10 +96,13 @@ def test_create_pending_transaction(ledger, db):
     assert obj.amount == Money(Decimal("50"))
 
     assert obj.prev_tx_id == prev_tx_id
-    assert obj.prev_current_balance == Money(Decimal("0"))
-    assert obj.prev_available_balance == Money(Decimal("0"))
-    assert obj.current_balance == Money(Decimal("0"))
-    assert obj.available_balance == Money(Decimal("0"))
+    assert_tx_balances(
+        obj,
+        current_balance=Money(Decimal(0)),
+        available_balance=Money(Decimal(0)),
+        prev_current_balance=Money(Decimal(0)),
+        prev_available_balance=Money(Decimal(0)),
+    )
 
 
 def test_cannot_create_transaction_with_duplicate_idempotency_key(ledger, db):
@@ -109,6 +132,7 @@ def test_settle_transaction(ledger, db):
         idempotency_key=pending_tx_idempotency_key,
         account_id=andy,
         amount=Money(Decimal("50")),
+        prev_tx_id=prev_tx_id,
     )
 
     settlement_tx_idempotency_key = uuid4()
@@ -126,10 +150,14 @@ def test_settle_transaction(ledger, db):
     assert obj.amount == Money(Decimal("50"))
 
     assert obj.prev_tx_id == pending_tx
-    assert obj.prev_current_balance == Money(Decimal("0"))
-    assert obj.prev_available_balance == Money(Decimal("0"))
-    assert obj.current_balance == Money(Decimal("50"))
-    assert obj.available_balance == Money(Decimal("50"))
+    assert_tx_balances(
+        obj,
+        prev_current_balance=Money(Decimal("0")),
+        prev_available_balance=Money(Decimal("0")),
+        current_balance=Money(Decimal("50")),
+        available_balance=Money(Decimal("50")),
+    )
+
 
 
 def test_list_transactions(ledger, db):
@@ -160,6 +188,7 @@ def test_list_transactions(ledger, db):
         idempotency_key=uuid4(),
         account_id=bill,
         amount=Money(Decimal("70")),
+        prev_tx_id=bill_prev_tx_id,
     )
 
     txs = ledger.list_transactions(account_id=andy)
