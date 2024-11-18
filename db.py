@@ -76,6 +76,10 @@ class Tx(Base):
 
         # only NEW_ACCOUNT transaction can have empty prev_tx_id
         CheckConstraint("type = 'NEW_ACCOUNT' OR prev_tx_id IS NOT NULL", name="tx_require_prev_tx_id"),
+
+        # these constraints ensures that balances never go negative
+        CheckConstraint("current_balance >= 0", name="tx_positive_current_balance"),
+        CheckConstraint("available_balance >= 0", name="tx_positive_available_balance"),
     )
 
     id: Mapped[bytes] = mapped_column(BYTEA(32), primary_key=True)
@@ -95,7 +99,9 @@ class Tx(Base):
     # `prev_tx_id` causes Tx to form a linked list chain that defines the
     # logical sequence of the transactions
     prev_tx_id: Mapped[Optional[bytes]] = mapped_column(
-        BYTEA(32), nullable=True, unique=True
+        BYTEA(32),
+        nullable=True,
+        unique=True,
     )
     prev_current_balance: Mapped[Decimal]
     prev_available_balance: Mapped[Decimal]

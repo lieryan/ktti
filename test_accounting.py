@@ -308,6 +308,66 @@ def test_settle_transaction(ledger, db, andy, andy_new_account_tx_id):
     )
 
 
+def test_setting_prev_tx_balances_when_creating_and_settling_transactions(ledger, db, andy, andy_new_account_tx_id):
+    tx1 = ledger.create_pending_transaction(
+        idempotency_key=uuid4(),
+        account_id=andy,
+        amount=Money(Decimal("50")),
+        prev_tx_id=andy_new_account_tx_id,
+    )
+
+    tx2 = ledger.settle_transaction(
+        idempotency_key=uuid4(),
+        original_tx_id=tx1,
+        prev_tx_id=tx1,
+    )
+
+    tx3 = ledger.create_pending_transaction(
+        idempotency_key=uuid4(),
+        account_id=andy,
+        amount=Money(Decimal("30")),
+        prev_tx_id=tx2,
+    )
+
+    tx4 = ledger.settle_transaction(
+        idempotency_key=uuid4(),
+        original_tx_id=tx3,
+        prev_tx_id=tx3,
+    )
+
+    assert_tx_balances(
+        ledger.session.get(Tx, tx1),
+        prev_current_balance=Decimal("0"),
+        prev_available_balance=Decimal("0"),
+        current_balance=Decimal("0"),
+        available_balance=Decimal("0"),
+    )
+
+    assert_tx_balances(
+        ledger.session.get(Tx, tx2),
+        prev_current_balance=Decimal("0"),
+        prev_available_balance=Decimal("0"),
+        current_balance=Decimal("50"),
+        available_balance=Decimal("50"),
+    )
+
+    assert_tx_balances(
+        ledger.session.get(Tx, tx3),
+        prev_current_balance=Decimal("50"),
+        prev_available_balance=Decimal("50"),
+        current_balance=Decimal("50"),
+        available_balance=Decimal("50"),
+    )
+
+    assert_tx_balances(
+        ledger.session.get(Tx, tx4),
+        prev_current_balance=Decimal("50"),
+        prev_available_balance=Decimal("50"),
+        current_balance=Decimal("80"),
+        available_balance=Decimal("80"),
+    )
+
+
 def test_list_transactions(
     ledger,
     db,

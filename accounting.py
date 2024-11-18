@@ -86,21 +86,22 @@ class Ledger(AutocommitSessionTransaction):
         amount: Money,
         prev_tx_id: Optional[TransactionId] = None,
     ):
-        obj = Tx(
-            idempotency_key=idempotency_key,
-            account_id=account_id,
-            type=TxType.PENDING,
-            amount=amount,
-
-            prev_tx_id=prev_tx_id,
-            prev_current_balance=Money(Decimal(0)),
-            prev_available_balance=Money(Decimal(0)),
-            current_balance=Money(Decimal(0)),
-            available_balance=Money(Decimal(0)),
-        )
-        obj._set_transaction_hash()
-
         with self:
+            prev_tx = self.session.get(Tx, prev_tx_id)
+            obj = Tx(
+                idempotency_key=idempotency_key,
+                account_id=account_id,
+                type=TxType.PENDING,
+                amount=amount,
+                prev_tx_id=prev_tx_id,
+                prev_current_balance=prev_tx.current_balance,
+                prev_available_balance=prev_tx.available_balance,
+                current_balance=prev_tx.current_balance,
+                available_balance=prev_tx.available_balance,
+            )
+            obj._set_transaction_hash()
+            obj.original_tx_id = obj.id
+
             self.session.add(obj)
             self.session.flush()
             return TransactionId(obj.id)
@@ -125,10 +126,9 @@ class Ledger(AutocommitSessionTransaction):
                 original_tx_id=original_tx_id,
                 type=TxType.SETTLEMENT,
                 amount=settled_amount,
-
                 prev_tx_id=prev_tx_id,
-                prev_current_balance=Money(Decimal(0)),
-                prev_available_balance=Money(Decimal(0)),
+                prev_current_balance=prev_tx.current_balance,
+                prev_available_balance=prev_tx.available_balance,
                 current_balance=prev_tx.current_balance + settled_amount,
                 available_balance=prev_tx.available_balance + settled_amount,
             )
