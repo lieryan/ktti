@@ -85,6 +85,15 @@ class Tx(Base):
     type: Mapped[TxType]
     amount: Mapped[Decimal]
 
+    # For refunds and settlements, the original_tx_id points to the pending
+    # transaction event
+    original_tx_id: Mapped[Optional[bytes]] = mapped_column(
+        BYTEA(32),
+        nullable=True,
+    )
+
+    # `prev_tx_id` causes Tx to form a linked list chain that defines the
+    # logical sequence of the transactions
     prev_tx_id: Mapped[Optional[bytes]] = mapped_column(
         BYTEA(32), nullable=True, unique=True
     )

@@ -166,6 +166,7 @@ def test_create_pending_transaction(
     assert is_sha256_bytes(obj.id)
     assert obj.idempotency_key == idempotency_key
     assert obj.account.id == andy
+    assert tx is not None and obj.original_tx_id == tx, "The original_tx of the pending Tx is the pending Tx itself"
     assert obj.type == TxType.PENDING
     assert obj.amount == Money(Decimal("50"))
 
@@ -285,7 +286,7 @@ def test_settle_transaction(ledger, db, andy, andy_new_account_tx_id):
     settlement_tx_idempotency_key = uuid4()
     settlement_tx = ledger.settle_transaction(
         idempotency_key=settlement_tx_idempotency_key,
-        pending_tx_id=pending_tx,
+        original_tx_id=pending_tx,
         prev_tx_id=pending_tx,
     )
 
@@ -293,6 +294,7 @@ def test_settle_transaction(ledger, db, andy, andy_new_account_tx_id):
     assert is_sha256_bytes(obj.id)
     assert obj.idempotency_key == settlement_tx_idempotency_key
     assert obj.account.id == andy
+    assert obj.original_tx_id == pending_tx
     assert obj.type == TxType.SETTLEMENT
     assert obj.amount == Money(Decimal("50"))
 
@@ -328,7 +330,7 @@ def test_list_transactions(
 
     settlement_tx = ledger.settle_transaction(
         idempotency_key=uuid4(),
-        pending_tx_id=tx1,
+        original_tx_id=tx1,
         prev_tx_id=tx2,
     )
 
