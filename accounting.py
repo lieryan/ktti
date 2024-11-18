@@ -81,7 +81,7 @@ class Ledger(AutocommitSessionTransaction):
 
     def create_pending_transaction(
         self,
-        idempotency_key: TransactionId,
+        idempotency_key: UUID,
         account_id: AccountId,
         amount: Money,
         prev_tx_id: Optional[TransactionId] = None,
@@ -103,7 +103,7 @@ class Ledger(AutocommitSessionTransaction):
 
     def settle_transaction(
         self,
-        idempotency_key: TransactionId,
+        idempotency_key: UUID,
         original_tx_id: TransactionId,
         prev_tx_id: Optional[TransactionId] = None,
     ):
@@ -134,7 +134,7 @@ class Ledger(AutocommitSessionTransaction):
 
     def refund_pending_transaction(
         self,
-        tx_id: TransactionId,
+        idempotency_key: UUID,
         amount: Optional[Money],
     ):
         """When `amount` is provided, do a partial refund."""
