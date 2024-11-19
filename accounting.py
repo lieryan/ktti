@@ -1,8 +1,9 @@
 from decimal import Decimal
-from typing import Optional, NewType
+from typing import Optional, NewType, Any
 from uuid import UUID, uuid4
 from dataclasses import dataclass
 
+import sqlalchemy
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -30,14 +31,14 @@ class AutocommitSessionTransaction:
     manager.
     """
 
-    def __init__(self, engine):
+    def __init__(self, engine: sqlalchemy.Engine):
         self.engine = engine
         self.session = Session(self.engine)
 
-    def __enter__(self):
+    def __enter__(self) -> sqlalchemy.orm.SessionTransaction:
         return self.session.begin()
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type: Exception, exc_val: Any, exc_tb: Any) -> None:
         if exc_type is None:
             try:
                 self.session.commit()
@@ -50,8 +51,6 @@ class AutocommitSessionTransaction:
 
 
 ## API
-
-
 
 
 def ensure_idempotency_key(idempotency_key: Optional[UUID]) -> UUID:
@@ -128,7 +127,7 @@ class Ledger(AutocommitSessionTransaction):
         *,
         idempotency_key: Optional[UUID] = None,
         prev_tx_id: Optional[TransactionId] = None,
-    ):
+    ) -> TransactionId:
         """
         Reflect the transaction amount to the current balance, if
         group_tx_id already have a settled Tx, do nothing.
@@ -167,7 +166,7 @@ class Ledger(AutocommitSessionTransaction):
         *,
         idempotency_key: Optional[UUID] = None,
         prev_tx_id: Optional[TransactionId] = None,
-    ):
+    ) -> TransactionId:
         """If `amount` is provided, do a partial refund."""
         idempotency_key = ensure_idempotency_key(idempotency_key)
         assert amount, "automatic determination of amount is not yet supported"

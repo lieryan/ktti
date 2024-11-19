@@ -13,19 +13,20 @@ from db import create_tables, Account, Tx, TxType
 
 
 @fixture
-def engine():
+def engine() -> sqlalchemy.Engine:
     return create_engine(
         "postgresql+psycopg://postgres:password@localhost:5432/postgres"
     )
 
 
 @fixture
-def ledger(engine):
+def ledger(engine: sqlalchemy.Engine) -> accounting.Ledger:
     return accounting.Ledger(engine)
 
 
 @fixture
-def db(engine):
+def db(engine: sqlalchemy.Engine) -> sqlalchemy.Engine:
+    """Re-initialize the database"""
     create_tables(engine)
     with engine.begin() as conn:
         conn.execute(text("DELETE FROM tx"))
@@ -39,19 +40,19 @@ def is_sha256_bytes(value: Any) -> bool:
 
 
 @fixture
-def _andy(ledger):
+def _andy(ledger):  # type: ignore[no-untyped-def]
     andy, prev_tx_id = ledger.create_account("andy")
     return andy, prev_tx_id
 
 
 @fixture
-def andy(_andy):
-    return _andy[0]
+def andy(_andy) -> accounting.AccountId:  # type: ignore[no-untyped-def]
+    return _andy[0]  # type: ignore[no-any-return]
 
 
 @fixture
-def andy_new_account_tx_id(_andy):
-    return _andy[1]
+def andy_new_account_tx_id(_andy) -> accounting.TransactionId:  # type: ignore[no-untyped-def]
+    return _andy[1]  # type: ignore[no-any-return]
 
 
 @fixture
@@ -95,19 +96,19 @@ def given_andy_has_settled_credit_transaction(ledger, db, andy, given_andy_accou
 
 
 @fixture
-def _bill(ledger):
+def _bill(ledger):  # type: ignore[no-untyped-def]
     bill, prev_tx_id = ledger.create_account("bill")
     return bill, prev_tx_id
 
 
 @fixture
-def bill(_bill):
-    return _bill[0]
+def bill(_bill) -> accounting.AccountId:  # type: ignore[no-untyped-def]
+    return _bill[0]  # type: ignore[no-any-return]
 
 
 @fixture
-def bill_new_account_tx_id(_bill):
-    return _bill[1]
+def bill_new_account_tx_id(_bill) -> accounting.TransactionId:  # type: ignore[no-untyped-def]
+    return _bill[1]  # type: ignore[no-any-return]
 
 
 @contextmanager
@@ -121,12 +122,12 @@ def assert_does_not_create_any_new_tx(ledger):
 
 
 def assert_tx_balances(
-    new_account_tx,
+    new_account_tx: Tx,
     *,
-    current_balance,
-    available_balance,
-    prev_current_balance,
-    prev_available_balance,
+    current_balance: Decimal,
+    available_balance: Decimal,
+    prev_current_balance: Decimal,
+    prev_available_balance: Decimal,
 ):
     assert new_account_tx.current_balance == current_balance
     assert new_account_tx.available_balance == available_balance
@@ -279,11 +280,11 @@ def test_create_pending_transaction_credit_insufficient_fund(
 
 def test_create_pending_transaction_with_explicit_idempotency_key(
     ledger: accounting.Ledger,
-    db,
+    db: sqlalchemy.Engine,
     andy: accounting.AccountId,
     andy_new_account_tx_id: accounting.TransactionId,
     given_andy_account_balance_is_100: accounting.TransactionId,
-):
+) -> None:
     explicit_idempotency_key = uuid4()
     pending_tx = ledger.create_pending_transaction(
         idempotency_key=explicit_idempotency_key,
@@ -293,6 +294,7 @@ def test_create_pending_transaction_with_explicit_idempotency_key(
     )
 
     obj = ledger.session.get(Tx, pending_tx)
+    assert obj is not None
     assert obj.idempotency_key == explicit_idempotency_key
 
 
@@ -518,10 +520,10 @@ def test_settle_transaction(ledger, db, andy, andy_new_account_tx_id):
 
 def test_settle_transaction_with_explicit_idempotency_key(
     ledger: accounting.Ledger,
-    db,
+    db: sqlalchemy.Engine,
     andy: accounting.AccountId,
     andy_new_account_tx_id: accounting.TransactionId,
-):
+) -> None:
     pending_tx_id = ledger.create_pending_transaction(
         account_id=andy,
         amount=Money(Decimal("30")),
@@ -536,18 +538,21 @@ def test_settle_transaction_with_explicit_idempotency_key(
     )
 
     settlement_tx = ledger.session.get(Tx, settlement_tx_id)
+    assert settlement_tx is not None
     assert settlement_tx.idempotency_key == explicit_idempotency_key
 
 
 def test_settle_non_group_tx(
     ledger: accounting.Ledger,
-    db,
+    db: sqlalchemy.Engine,
     andy: accounting.AccountId,
     andy_new_account_tx_id: accounting.TransactionId,
-    given_andy_has_settled_credit_transaction,
+    given_andy_has_settled_credit_transaction: accounting.TransactionId,
 ) -> None:
     with ledger:
-        assert ledger.session.get(Tx, given_andy_has_settled_credit_transaction).type == TxType.SETTLEMENT
+        settlement_tx = ledger.session.get(Tx, given_andy_has_settled_credit_transaction)
+        assert settlement_tx is not None
+        assert settlement_tx.type == TxType.SETTLEMENT
 
     with assert_does_not_create_any_new_tx(ledger), \
             raises(ValueError, match="is not a Group ID."):
@@ -616,10 +621,10 @@ def test_setting_prev_tx_balances_when_creating_and_settling_transactions(ledger
 
 def test_refund_pending_debit_transaction(
     ledger: accounting.Ledger,
-    db,
+    db: sqlalchemy.Engine,
     andy: accounting.AccountId,
     andy_new_account_tx_id: accounting.TransactionId,
-    given_andy_account_balance_is_100,
+    given_andy_account_balance_is_100: accounting.TransactionId,
 ) -> None:
     debit_tx = ledger.create_pending_transaction(
         account_id=andy,
@@ -637,13 +642,15 @@ def test_refund_pending_debit_transaction(
 
 def test_refund_non_group_tx(
     ledger: accounting.Ledger,
-    db,
+    db: sqlalchemy.Engine,
     andy: accounting.AccountId,
     andy_new_account_tx_id: accounting.TransactionId,
-    given_andy_has_settled_credit_transaction,
+    given_andy_has_settled_credit_transaction: accounting.TransactionId,
 ) -> None:
     with ledger:
-        assert ledger.session.get(Tx, given_andy_has_settled_credit_transaction).type == TxType.SETTLEMENT
+        settlement_tx = ledger.session.get(Tx, given_andy_has_settled_credit_transaction)
+        assert settlement_tx is not None
+        assert settlement_tx.type == TxType.SETTLEMENT
 
     with assert_does_not_create_any_new_tx(ledger), \
             raises(ValueError, match="is not a Group ID."):
@@ -656,10 +663,10 @@ def test_refund_non_group_tx(
 
 def test_refund_pending_credit_transaction(
     ledger: accounting.Ledger,
-    db,
+    db: sqlalchemy.Engine,
     andy: accounting.AccountId,
     andy_new_account_tx_id: accounting.TransactionId,
-    given_andy_account_balance_is_100,
+    given_andy_account_balance_is_100: accounting.TransactionId,
 ) -> None:
     credit_tx_id = ledger.create_pending_transaction(
         account_id=andy,
@@ -685,6 +692,7 @@ def test_refund_pending_credit_transaction(
     )
 
     credit_tx = ledger.session.get(Tx, credit_tx_id)
+    assert credit_tx is not None
     assert credit_tx.amount == Money(Decimal("-50"))
     assert credit_tx.pending_amount == Money(Decimal("-50"))
     assert_tx_balances(
@@ -696,6 +704,7 @@ def test_refund_pending_credit_transaction(
     )
 
     refund_tx = ledger.session.get(Tx, refund_tx_id)
+    assert refund_tx is not None
     assert refund_tx.amount == Money(Decimal("20"))
     assert refund_tx.pending_amount == Money(Decimal("-30"))
     assert_tx_balances(
@@ -707,6 +716,7 @@ def test_refund_pending_credit_transaction(
     )
 
     refund2_tx = ledger.session.get(Tx, refund2_tx_id)
+    assert refund2_tx is not None
     assert refund2_tx.amount == Money(Decimal("12"))
     assert refund2_tx.pending_amount == Money(Decimal("-18"))
     assert_tx_balances(
@@ -718,6 +728,7 @@ def test_refund_pending_credit_transaction(
     )
 
     settlement_tx = ledger.session.get(Tx, settlement_tx_id)
+    assert settlement_tx is not None
     assert settlement_tx.amount == Money(Decimal("-18"))
     assert settlement_tx.pending_amount == Money(Decimal("-18"))
     assert_tx_balances(
