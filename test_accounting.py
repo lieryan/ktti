@@ -343,12 +343,12 @@ def test_cannot_create_transaction_with_duplicate_idempotency_key(
     with assert_does_not_create_any_new_tx(ledger), \
             raises(
                 sqlalchemy.exc.IntegrityError,
-                match='duplicate key value violates unique constraint "tx_pkey"',
+                match='duplicate key value violates unique constraint "tx_idempotency_key_key"',
             ):
         tx = ledger.create_pending_transaction(
             idempotency_key=idempotency_key,
             account_id=andy,
-            amount=Money(Decimal("50")),
+            amount=Money(Decimal("20")),
             prev_tx_id=andy_new_account_tx_id,
         )
 
