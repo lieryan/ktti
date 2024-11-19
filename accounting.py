@@ -1,7 +1,7 @@
-from decimal import Decimal
-from typing import Optional, NewType, Any
-from uuid import UUID, uuid4
 from dataclasses import dataclass
+from decimal import Decimal
+from typing import Optional, NewType, Any, Iterator
+from uuid import UUID, uuid4
 
 import sqlalchemy
 from sqlalchemy import select
@@ -211,7 +211,8 @@ class Ledger(AutocommitSessionTransaction):
         )
         new_account_tx, = (tx for tx in results if tx.type == TxType.NEW_ACCOUNT)
 
-        def iterate_sorted_chain(it):
+        def iterate_sorted_chain(start: Tx) -> Iterator[Tx]:
+            it: Optional[Tx] = start
             while it:
                 yield it
                 it = it.next_tx
