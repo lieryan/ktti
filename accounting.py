@@ -65,6 +65,7 @@ class Ledger(AutocommitSessionTransaction):
     def create_account(
         self,
         name: str,
+        *,
         idempotency_key: Optional[UUID] = None,
     ) -> tuple[AccountId, TransactionId]:
         idempotency_key = ensure_idempotency_key(idempotency_key)
@@ -98,6 +99,7 @@ class Ledger(AutocommitSessionTransaction):
         self,
         account_id: AccountId,
         amount: Money,
+        *,
         idempotency_key: Optional[UUID] = None,
         prev_tx_id: Optional[TransactionId] = None,
     ) -> TransactionId:
@@ -123,6 +125,7 @@ class Ledger(AutocommitSessionTransaction):
     def settle_transaction(
         self,
         group_tx_id: TransactionId,
+        *,
         idempotency_key: Optional[UUID] = None,
         prev_tx_id: Optional[TransactionId] = None,
     ):
@@ -141,7 +144,7 @@ class Ledger(AutocommitSessionTransaction):
             )
             group_latest_tx_id = self.get_latest_group_transaction(group_tx.id)
             group_latest_tx = self.session.get(Tx, group_latest_tx_id)
-            settled_amount = group_latest_tx.pending_amount  # TODO: calculate settled amount
+            settled_amount = group_latest_tx.pending_amount
             obj.amount = settled_amount
             obj.pending_amount = settled_amount
             obj.group_prev_pending_amount = group_latest_tx.pending_amount
@@ -160,6 +163,7 @@ class Ledger(AutocommitSessionTransaction):
         self,
         group_tx_id: TransactionId,
         amount: Optional[Money],
+        *,
         idempotency_key: Optional[UUID] = None,
         prev_tx_id: Optional[TransactionId] = None,
     ):
