@@ -52,11 +52,22 @@ class AutocommitSessionTransaction:
 ## API
 
 
+
+
+def ensure_idempotency_key(idempotency_key: Optional[UUID]) -> UUID:
+    if idempotency_key is None:
+        return uuid4()
+    else:
+        return idempotency_key
+
+
 class Ledger(AutocommitSessionTransaction):
     def create_account(
         self,
         name: str,
+        idempotency_key: Optional[UUID] = None,
     ) -> tuple[AccountId, TransactionId]:
+        idempotency_key = ensure_idempotency_key(idempotency_key)
         with self:
             obj = Account(name=name)
 
@@ -64,7 +75,7 @@ class Ledger(AutocommitSessionTransaction):
             self.session.flush()
 
             new_account_tx = Tx(
-                idempotency_key=uuid4(),
+                idempotency_key=idempotency_key,
                 account_id=obj.id,
                 type=TxType.NEW_ACCOUNT,
                 amount=0,
@@ -85,11 +96,12 @@ class Ledger(AutocommitSessionTransaction):
 
     def create_pending_transaction(
         self,
-        idempotency_key: UUID,
         account_id: AccountId,
         amount: Money,
+        idempotency_key: Optional[UUID] = None,
         prev_tx_id: Optional[TransactionId] = None,
     ) -> TransactionId:
+        idempotency_key = ensure_idempotency_key(idempotency_key)
         with self:
             obj = Tx(
                 idempotency_key=idempotency_key,
@@ -110,14 +122,15 @@ class Ledger(AutocommitSessionTransaction):
 
     def settle_transaction(
         self,
-        idempotency_key: UUID,
         group_tx_id: TransactionId,
+        idempotency_key: Optional[UUID] = None,
         prev_tx_id: Optional[TransactionId] = None,
     ):
         """
         Reflect the transaction amount to the current balance, if
         group_tx_id already have a settled Tx, do nothing.
         """
+        idempotency_key = ensure_idempotency_key(idempotency_key)
         with self:
             group_tx = self.session.get(Tx, group_tx_id)
             assert group_tx.type == TxType.PENDING
@@ -145,12 +158,13 @@ class Ledger(AutocommitSessionTransaction):
 
     def refund_pending_transaction(
         self,
-        idempotency_key: UUID,
         group_tx_id: TransactionId,
         amount: Optional[Money],
+        idempotency_key: Optional[UUID] = None,
         prev_tx_id: Optional[TransactionId] = None,
     ):
         """If `amount` is provided, do a partial refund."""
+        idempotency_key = ensure_idempotency_key(idempotency_key)
         assert amount, "automatic determination of amount is not yet supported"
         with self:
             group_tx = self.session.get(Tx, group_tx_id)

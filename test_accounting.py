@@ -57,13 +57,11 @@ def andy_new_account_tx_id(_andy):
 @fixture
 def andy_account_balance_is_100(ledger, db, andy, andy_new_account_tx_id):
     debit_tx_id = ledger.create_pending_transaction(
-        idempotency_key=uuid4(),
         account_id=andy,
         amount=Money(Decimal("100")),
         prev_tx_id=andy_new_account_tx_id,
     )
     settlement_tx_id = ledger.settle_transaction(
-        idempotency_key=uuid4(),
         group_tx_id=debit_tx_id,
         prev_tx_id=debit_tx_id,
     )
@@ -300,14 +298,12 @@ def test_next_tx_prev_tx_relationships_are_correctly_linked(
     andy_new_account_tx_id,
 ):
     tx1 = ledger.create_pending_transaction(
-        idempotency_key=uuid4(),
         account_id=andy,
         amount=Money(Decimal("50")),
         prev_tx_id=andy_new_account_tx_id,
     )
 
     tx2 = ledger.create_pending_transaction(
-        idempotency_key=uuid4(),
         account_id=andy,
         amount=Money(Decimal("50")),
         prev_tx_id=tx1,
@@ -331,35 +327,30 @@ def test_group_next_tx_group_prev_tx_relationships_are_correctly_linked(
     andy_account_balance_is_100,
 ):
     tx1 = ledger.create_pending_transaction(
-        idempotency_key=uuid4(),
         account_id=andy,
         amount=Money(Decimal("-50")),
         prev_tx_id=andy_account_balance_is_100,
     )
 
     tx2 = ledger.refund_pending_transaction(
-        idempotency_key=uuid4(),
         group_tx_id=tx1,
         amount=Money(Decimal("10")),
         prev_tx_id=tx1,
     )
 
     tx3 = ledger.create_pending_transaction(
-        idempotency_key=uuid4(),
         account_id=andy,
         amount=Money(Decimal("20")),
         prev_tx_id=tx2,
     )
 
     tx4 = ledger.refund_pending_transaction(
-        idempotency_key=uuid4(),
         group_tx_id=tx1,
         amount=Money(Decimal("30")),
         prev_tx_id=tx3,
     )
 
     tx5 = ledger.settle_transaction(
-        idempotency_key=uuid4(),
         group_tx_id=tx1,
         prev_tx_id=tx4,
     )
@@ -397,7 +388,6 @@ def test_cannot_create_pending_transaction_if_prev_tx_id_does_not_match_the_acco
     with assert_does_not_create_any_new_tx(ledger), \
             raises(sqlalchemy.exc.IntegrityError, match='violates foreign key constraint "tx_account_id_prev_tx_id_fkey"'):
         tx = ledger.create_pending_transaction(
-            idempotency_key=uuid4(),
             account_id=bill,
             amount=Money(Decimal("50")),
             prev_tx_id=andy_new_account_tx_id,
@@ -438,7 +428,6 @@ def test_group_prev_tx_id_cannot_be_empty_except_for_pending_and_new_account_tra
     andy_account_balance_is_100,
 ):
     tx1 = ledger.create_pending_transaction(
-        idempotency_key=uuid4(),
         account_id=andy,
         amount=Money(Decimal("-50")),
         prev_tx_id=andy_account_balance_is_100,
@@ -503,27 +492,23 @@ def test_settle_transaction(ledger, db, andy, andy_new_account_tx_id):
 
 def test_setting_prev_tx_balances_when_creating_and_settling_transactions(ledger, db, andy, andy_new_account_tx_id):
     tx1 = ledger.create_pending_transaction(
-        idempotency_key=uuid4(),
         account_id=andy,
         amount=Money(Decimal("50")),
         prev_tx_id=andy_new_account_tx_id,
     )
 
     tx2 = ledger.settle_transaction(
-        idempotency_key=uuid4(),
         group_tx_id=tx1,
         prev_tx_id=tx1,
     )
 
     tx3 = ledger.create_pending_transaction(
-        idempotency_key=uuid4(),
         account_id=andy,
         amount=Money(Decimal("30")),
         prev_tx_id=tx2,
     )
 
     tx4 = ledger.settle_transaction(
-        idempotency_key=uuid4(),
         group_tx_id=tx3,
         prev_tx_id=tx3,
     )
@@ -569,7 +554,6 @@ def test_refund_pending_debit_transaction(
     andy_account_balance_is_100,
 ) -> None:
     debit_tx = ledger.create_pending_transaction(
-        idempotency_key=uuid4(),
         account_id=andy,
         amount=Money(Decimal("50")),
         prev_tx_id=andy_account_balance_is_100,
@@ -578,7 +562,6 @@ def test_refund_pending_debit_transaction(
     with assert_does_not_create_any_new_tx(ledger), \
             raises(ValueError, match="Can only refund credit transaction."):
         refund_tx = ledger.refund_pending_transaction(
-            idempotency_key=uuid4(),
             group_tx_id=debit_tx,
             amount=Money(Decimal("20")),
         )
@@ -591,28 +574,24 @@ def test_refund_pending_credit_transaction(
     andy_account_balance_is_100,
 ) -> None:
     credit_tx_id = ledger.create_pending_transaction(
-        idempotency_key=uuid4(),
         account_id=andy,
         amount=Money(Decimal("-50")),
         prev_tx_id=andy_account_balance_is_100,
     )
 
     refund_tx_id = ledger.refund_pending_transaction(
-        idempotency_key=uuid4(),
         group_tx_id=credit_tx_id,
         amount=Money(Decimal("20")),
         prev_tx_id=credit_tx_id,
     )
 
     refund2_tx_id = ledger.refund_pending_transaction(
-        idempotency_key=uuid4(),
         group_tx_id=credit_tx_id,
         amount=Money(Decimal("12")),
         prev_tx_id=refund_tx_id,
     )
 
     settlement_tx_id = ledger.settle_transaction(
-        idempotency_key=uuid4(),
         group_tx_id=credit_tx_id,
         prev_tx_id=refund2_tx_id,
     )
@@ -669,27 +648,23 @@ def test_list_transactions(
     bill, bill_new_account_tx_id,
 ):
     tx1 = ledger.create_pending_transaction(
-        idempotency_key=uuid4(),
         account_id=andy,
         amount=Money(Decimal("50")),
         prev_tx_id=andy_new_account_tx_id,
     )
 
     tx2 = ledger.create_pending_transaction(
-        idempotency_key=uuid4(),
         account_id=andy,
         amount=Money(Decimal("60")),
         prev_tx_id=tx1,
     )
 
     settlement_tx = ledger.settle_transaction(
-        idempotency_key=uuid4(),
         group_tx_id=tx1,
         prev_tx_id=tx2,
     )
 
     tx_on_other_account = ledger.create_pending_transaction(
-        idempotency_key=uuid4(),
         account_id=bill,
         amount=Money(Decimal("70")),
         prev_tx_id=bill_new_account_tx_id,
@@ -718,27 +693,23 @@ def test_get_latest_transaction(
     andy_new_account_tx_id,
 ):
     tx1 = ledger.create_pending_transaction(
-        idempotency_key=uuid4(),
         account_id=andy,
         amount=Money(Decimal("50")),
         prev_tx_id=andy_new_account_tx_id,
     )
 
     tx2 = ledger.create_pending_transaction(
-        idempotency_key=uuid4(),
         account_id=andy,
         amount=Money(Decimal("50")),
         prev_tx_id=tx1,
     )
 
     tx3 = ledger.settle_transaction(
-        idempotency_key=uuid4(),
         group_tx_id=tx1,
         prev_tx_id=tx2,
     )
 
     tx4 = ledger.create_pending_transaction(
-        idempotency_key=uuid4(),
         account_id=andy,
         amount=Money(Decimal("50")),
         prev_tx_id=tx3,
