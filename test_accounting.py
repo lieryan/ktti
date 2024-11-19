@@ -199,9 +199,7 @@ def test_create_pending_transaction_debit(
     andy,
     andy_new_account_tx_id,
 ):
-    idempotency_key = uuid4()
     tx = ledger.create_pending_transaction(
-        idempotency_key=idempotency_key,
         account_id=andy,
         amount=Money(Decimal("50")),
         prev_tx_id=andy_new_account_tx_id,
@@ -209,7 +207,6 @@ def test_create_pending_transaction_debit(
 
     obj = ledger.session.execute(select(Tx).where(Tx.type == TxType.PENDING)).scalar_one()
     assert is_sha256_bytes(obj.id)
-    assert obj.idempotency_key == idempotency_key
     assert obj.account.id == andy
     assert obj.type == TxType.PENDING
     assert obj.amount == Money(Decimal("50"))
@@ -235,9 +232,7 @@ def test_create_pending_transaction_credit(
     andy_new_account_tx_id,
     given_andy_account_balance_is_100,
 ):
-    idempotency_key = uuid4()
     pending_tx = ledger.create_pending_transaction(
-        idempotency_key=idempotency_key,
         account_id=andy,
         amount=Money(Decimal("-50")),
         prev_tx_id=given_andy_account_balance_is_100,
@@ -245,7 +240,6 @@ def test_create_pending_transaction_credit(
 
     obj = ledger.session.get(Tx, pending_tx)
     assert is_sha256_bytes(obj.id)
-    assert obj.idempotency_key == idempotency_key
     assert obj.account.id == andy
     assert obj.type == TxType.PENDING
     assert obj.amount == Money(Decimal("-50"))
@@ -271,18 +265,35 @@ def test_create_pending_transaction_credit_insufficient_fund(
     andy_new_account_tx_id,
     given_andy_account_balance_is_100,
 ):
-    idempotency_key = uuid4()
     with assert_does_not_create_any_new_tx(ledger), \
             raises(
                 sqlalchemy.exc.IntegrityError,
                 match='violates check constraint "tx_positive_available_balance"',
             ):
         pending_tx = ledger.create_pending_transaction(
-            idempotency_key=idempotency_key,
             account_id=andy,
             amount=Money(Decimal("-150")),
             prev_tx_id=given_andy_account_balance_is_100,
         )
+
+
+def test_create_pending_transaction_with_explicit_idempotency_key(
+    ledger: accounting.Ledger,
+    db,
+    andy: accounting.AccountId,
+    andy_new_account_tx_id: accounting.TransactionId,
+    given_andy_account_balance_is_100: accounting.TransactionId,
+):
+    explicit_idempotency_key = uuid4()
+    pending_tx = ledger.create_pending_transaction(
+        idempotency_key=explicit_idempotency_key,
+        account_id=andy,
+        amount=Money(Decimal("-50")),
+        prev_tx_id=given_andy_account_balance_is_100,
+    )
+
+    obj = ledger.session.get(Tx, pending_tx)
+    assert obj.idempotency_key == explicit_idempotency_key
 
 
 def test_cannot_create_transaction_with_duplicate_idempotency_key(
@@ -475,24 +486,19 @@ def test_group_prev_tx_id_cannot_be_empty_except_for_pending_and_new_account_tra
 
 
 def test_settle_transaction(ledger, db, andy, andy_new_account_tx_id):
-    pending_tx_idempotency_key = uuid4()
     pending_tx_id = ledger.create_pending_transaction(
-        idempotency_key=pending_tx_idempotency_key,
         account_id=andy,
         amount=Money(Decimal("30")),
         prev_tx_id=andy_new_account_tx_id,
     )
 
-    settlement_tx_idempotency_key = uuid4()
     settlement_tx_id = ledger.settle_transaction(
-        idempotency_key=settlement_tx_idempotency_key,
         group_tx_id=pending_tx_id,
         prev_tx_id=pending_tx_id,
     )
 
     settlement_tx = ledger.session.get(Tx, settlement_tx_id)
     assert is_sha256_bytes(settlement_tx.id)
-    assert settlement_tx.idempotency_key == settlement_tx_idempotency_key
     assert settlement_tx.account.id == andy
     assert settlement_tx.group_tx_id == pending_tx_id
     assert settlement_tx.type == TxType.SETTLEMENT
@@ -508,6 +514,29 @@ def test_settle_transaction(ledger, db, andy, andy_new_account_tx_id):
         current_balance=Money(Decimal("30")),
         available_balance=Money(Decimal("30")),
     )
+
+
+def test_settle_transaction_with_explicit_idempotency_key(
+    ledger: accounting.Ledger,
+    db,
+    andy: accounting.AccountId,
+    andy_new_account_tx_id: accounting.TransactionId,
+):
+    pending_tx_id = ledger.create_pending_transaction(
+        account_id=andy,
+        amount=Money(Decimal("30")),
+        prev_tx_id=andy_new_account_tx_id,
+    )
+
+    explicit_idempotency_key = uuid4()
+    settlement_tx_id = ledger.settle_transaction(
+        idempotency_key=explicit_idempotency_key,
+        group_tx_id=pending_tx_id,
+        prev_tx_id=pending_tx_id,
+    )
+
+    settlement_tx = ledger.session.get(Tx, settlement_tx_id)
+    assert settlement_tx.idempotency_key == explicit_idempotency_key
 
 
 def test_settle_non_group_tx(
