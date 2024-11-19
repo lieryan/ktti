@@ -24,7 +24,7 @@ def ledger(engine: sqlalchemy.Engine) -> accounting.Ledger:
     return accounting.Ledger(engine)
 
 
-@fixture
+@fixture(autouse=True)
 def db(engine: sqlalchemy.Engine) -> sqlalchemy.Engine:
     """Re-initialize the database"""
     create_tables(engine)
@@ -56,7 +56,7 @@ def andy_new_account_tx_id(_andy) -> accounting.TransactionId:  # type: ignore[n
 
 
 @fixture
-def given_andy_account_balance_is_100(ledger, db, andy, andy_new_account_tx_id):
+def given_andy_account_balance_is_100(ledger, andy, andy_new_account_tx_id):
     debit_tx_id = ledger.create_pending_transaction(
         account_id=andy,
         amount=Money(Decimal("100")),
@@ -76,7 +76,7 @@ def given_andy_account_balance_is_100(ledger, db, andy, andy_new_account_tx_id):
 
 
 @fixture
-def given_andy_has_settled_credit_transaction(ledger, db, andy, given_andy_account_balance_is_100):
+def given_andy_has_pending_credit_transaction(ledger, andy, given_andy_account_balance_is_100):
     credit_tx_id = ledger.create_pending_transaction(
         account_id=andy,
         amount=Money(Decimal("-30")),
@@ -135,7 +135,7 @@ def assert_tx_balances(
     assert new_account_tx.prev_available_balance == prev_available_balance
 
 
-def test_create_account(ledger, db):
+def test_create_account(ledger):
     andy, new_account_tx_id = ledger.create_account("andy")
 
     account = ledger.session.execute(select(Account)).scalar_one()
@@ -158,7 +158,7 @@ def test_create_account(ledger, db):
     )
 
 
-def test_cannot_create_two_accounts_with_the_same_name(ledger, db):
+def test_cannot_create_two_accounts_with_the_same_name(ledger):
     andy, new_account_tx_id = ledger.create_account("andy")
     with assert_does_not_create_any_new_tx(ledger), \
             raises(
@@ -168,7 +168,7 @@ def test_cannot_create_two_accounts_with_the_same_name(ledger, db):
         ledger.create_account("andy")
 
 
-def test_cannot_create_new_account_transaction_for_the_same_account(ledger, db):
+def test_cannot_create_new_account_transaction_for_the_same_account(ledger):
     andy, new_account_tx_id = ledger.create_account("andy")
     with assert_does_not_create_any_new_tx(ledger), \
             raises(
@@ -196,7 +196,6 @@ def test_cannot_create_new_account_transaction_for_the_same_account(ledger, db):
 
 def test_create_pending_transaction_debit(
     ledger,
-    db,
     andy,
     andy_new_account_tx_id,
 ):
@@ -228,7 +227,6 @@ def test_create_pending_transaction_debit(
 
 def test_create_pending_transaction_credit(
     ledger,
-    db,
     andy,
     andy_new_account_tx_id,
     given_andy_account_balance_is_100,
@@ -261,7 +259,6 @@ def test_create_pending_transaction_credit(
 
 def test_create_pending_transaction_credit_insufficient_fund(
     ledger,
-    db,
     andy,
     andy_new_account_tx_id,
     given_andy_account_balance_is_100,
@@ -280,7 +277,6 @@ def test_create_pending_transaction_credit_insufficient_fund(
 
 def test_create_pending_transaction_with_explicit_idempotency_key(
     ledger: accounting.Ledger,
-    db: sqlalchemy.Engine,
     andy: accounting.AccountId,
     andy_new_account_tx_id: accounting.TransactionId,
     given_andy_account_balance_is_100: accounting.TransactionId,
@@ -300,7 +296,6 @@ def test_create_pending_transaction_with_explicit_idempotency_key(
 
 def test_cannot_create_transaction_with_duplicate_idempotency_key(
     ledger,
-    db,
     andy,
     andy_new_account_tx_id,
 ):
@@ -326,7 +321,6 @@ def test_cannot_create_transaction_with_duplicate_idempotency_key(
 
 def test_next_tx_prev_tx_relationships_are_correctly_linked(
     ledger,
-    db,
     andy,
     andy_new_account_tx_id,
 ):
@@ -354,7 +348,6 @@ def test_next_tx_prev_tx_relationships_are_correctly_linked(
 
 def test_group_next_tx_group_prev_tx_relationships_are_correctly_linked(
     ledger,
-    db,
     andy,
     andy_new_account_tx_id,
     given_andy_account_balance_is_100,
@@ -413,7 +406,6 @@ def test_group_next_tx_group_prev_tx_relationships_are_correctly_linked(
 
 def test_cannot_create_pending_transaction_if_prev_tx_id_does_not_match_the_account_id(
     ledger,
-    db,
     andy,
     andy_new_account_tx_id,
     bill,
@@ -429,7 +421,6 @@ def test_cannot_create_pending_transaction_if_prev_tx_id_does_not_match_the_acco
 
 def test_prev_tx_id_cannot_be_empty_except_for_new_account_transaction(
     ledger,
-    db,
     andy,
     andy_new_account_tx_id,
 ):
@@ -455,7 +446,6 @@ def test_prev_tx_id_cannot_be_empty_except_for_new_account_transaction(
 
 def test_group_prev_tx_id_cannot_be_empty_except_for_pending_and_new_account_transaction(
     ledger,
-    db,
     andy,
     andy_new_account_tx_id,
     given_andy_account_balance_is_100,
@@ -487,7 +477,7 @@ def test_group_prev_tx_id_cannot_be_empty_except_for_pending_and_new_account_tra
             ledger.session.add(new_tx)
 
 
-def test_settle_transaction(ledger, db, andy, andy_new_account_tx_id):
+def test_settle_transaction(ledger, andy, andy_new_account_tx_id):
     pending_tx_id = ledger.create_pending_transaction(
         account_id=andy,
         amount=Money(Decimal("30")),
@@ -520,7 +510,6 @@ def test_settle_transaction(ledger, db, andy, andy_new_account_tx_id):
 
 def test_settle_transaction_with_explicit_idempotency_key(
     ledger: accounting.Ledger,
-    db: sqlalchemy.Engine,
     andy: accounting.AccountId,
     andy_new_account_tx_id: accounting.TransactionId,
 ) -> None:
@@ -544,7 +533,6 @@ def test_settle_transaction_with_explicit_idempotency_key(
 
 def test_settle_non_group_tx(
     ledger: accounting.Ledger,
-    db: sqlalchemy.Engine,
     andy: accounting.AccountId,
     andy_new_account_tx_id: accounting.TransactionId,
     given_andy_has_settled_credit_transaction: accounting.TransactionId,
@@ -563,7 +551,7 @@ def test_settle_non_group_tx(
 
 
 
-def test_setting_prev_tx_balances_when_creating_and_settling_transactions(ledger, db, andy, andy_new_account_tx_id):
+def test_setting_prev_tx_balances_when_creating_and_settling_transactions(ledger, andy, andy_new_account_tx_id):
     tx1 = ledger.create_pending_transaction(
         account_id=andy,
         amount=Money(Decimal("50")),
@@ -621,7 +609,6 @@ def test_setting_prev_tx_balances_when_creating_and_settling_transactions(ledger
 
 def test_refund_pending_debit_transaction(
     ledger: accounting.Ledger,
-    db: sqlalchemy.Engine,
     andy: accounting.AccountId,
     andy_new_account_tx_id: accounting.TransactionId,
     given_andy_account_balance_is_100: accounting.TransactionId,
@@ -642,7 +629,6 @@ def test_refund_pending_debit_transaction(
 
 def test_refund_non_group_tx(
     ledger: accounting.Ledger,
-    db: sqlalchemy.Engine,
     andy: accounting.AccountId,
     andy_new_account_tx_id: accounting.TransactionId,
     given_andy_has_settled_credit_transaction: accounting.TransactionId,
@@ -663,7 +649,6 @@ def test_refund_non_group_tx(
 
 def test_refund_pending_credit_transaction(
     ledger: accounting.Ledger,
-    db: sqlalchemy.Engine,
     andy: accounting.AccountId,
     andy_new_account_tx_id: accounting.TransactionId,
     given_andy_account_balance_is_100: accounting.TransactionId,
@@ -742,7 +727,6 @@ def test_refund_pending_credit_transaction(
 
 def test_list_transactions(
     ledger,
-    db,
     andy, andy_new_account_tx_id,
     bill, bill_new_account_tx_id,
 ):
@@ -787,7 +771,6 @@ def test_list_transactions(
 
 def test_get_latest_transaction(
     ledger,
-    db,
     andy,
     andy_new_account_tx_id,
 ):
