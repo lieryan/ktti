@@ -476,6 +476,7 @@ def test_prev_tx_id_cannot_be_empty_except_for_new_account_transaction(
                 available_balance=Money(Decimal(0)),
             )
             new_tx._set_transaction_hash()
+            new_tx._set_group_tx_root()
             ledger.session.add(new_tx)
 
 

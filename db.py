@@ -130,7 +130,10 @@ class Tx(Base):
         CheckConstraint("type = 'NEW_ACCOUNT' OR prev_tx_id IS NOT NULL", name="tx_require_prev_tx_id"),
 
         # only NEW_ACCOUNT and PENDING transaction can have empty group_prev_tx_id
-        CheckConstraint("type = 'NEW_ACCOUNT' or type = 'PENDING' OR group_prev_tx_id IS NOT NULL", name="tx_require_group_prev_tx_id"),
+        CheckConstraint("type = 'NEW_ACCOUNT' OR type = 'PENDING' OR group_prev_tx_id IS NOT NULL", name="tx_require_group_prev_tx_id"),
+
+        # only NEW_ACCOUNT can have empty group_tx_id
+        CheckConstraint("type = 'NEW_ACCOUNT' OR group_tx_id IS NOT NULL", name="tx_require_group_tx_id"),
 
         # balances should never go negative, the prev_* balance does not
         # require their own constraint since they are always checked against by
