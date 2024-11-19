@@ -873,3 +873,15 @@ def test_get_latest_transaction(
     latest_tx = ledger.get_latest_transaction(andy)
 
     assert latest_tx == tx4
+
+
+def test_get_balance(
+    ledger: accounting.Ledger,
+    andy: accounting.AccountId,
+    given_andy_has_pending_credit_transaction: accounting.TransactionId,
+) -> None:
+    balance = ledger.get_balance(andy)
+    assert balance == accounting.Balance(
+        current=Money(Decimal("100")),
+        available=Money(Decimal("70")),
+    )

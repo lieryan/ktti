@@ -194,9 +194,11 @@ class Ledger(AutocommitSessionTransaction):
         self,
         account_id: AccountId,
     ) -> Balance:
+        tx = self.session.get(Tx, self.get_latest_transaction(account_id))
+        assert tx is not None
         return Balance(
-            current=Money(Decimal()),
-            available=Money(Decimal()),
+            current=Money(tx.current_balance),
+            available=Money(tx.available_balance),
         )
 
     def list_transactions(
