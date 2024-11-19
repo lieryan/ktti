@@ -216,7 +216,7 @@ class Tx(Base):
         # adding prev_tx_id into the hashed data means that alterations to
         # previous transaction entries would cause the hashes to become
         # invalid.
-        data = f"{(self.prev_tx_id or b'').hex()}|{self.idempotency_key}|{self.account_id}|{self.type}|{self.amount.normalize()}"
+        data = f"{(self.prev_tx_id or b'').hex()}|{self.idempotency_key}|{self.account_id}|{self.type}|{Decimal(self.amount).normalize()}"
         tx_hash = sha256(data.encode("ascii")).digest()
         assert self.id is None or self.id == tx_hash
         return tx_hash

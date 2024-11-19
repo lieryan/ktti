@@ -67,16 +67,16 @@ class Ledger(AutocommitSessionTransaction):
                 idempotency_key=uuid4(),
                 account_id=obj.id,
                 type=TxType.NEW_ACCOUNT,
-                amount=Money(Decimal(0)),
-                pending_amount=Money(Decimal(0)),
+                amount=0,
+                pending_amount=0,
                 group_tx_id=None,
                 group_prev_tx_id=None,
-                group_prev_pending_amount=Money(Decimal(0)),
+                group_prev_pending_amount=0,
                 prev_tx_id=None,
-                prev_current_balance=Money(Decimal(0)),
-                prev_available_balance=Money(Decimal(0)),
-                current_balance=Money(Decimal(0)),
-                available_balance=Money(Decimal(0)),
+                prev_current_balance=0,
+                prev_available_balance=0,
+                current_balance=0,
+                available_balance=0,
             )
             new_account_tx._set_transaction_hash()
             self.session.add(new_account_tx)
