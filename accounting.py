@@ -136,7 +136,8 @@ class Ledger(AutocommitSessionTransaction):
         idempotency_key = ensure_idempotency_key(idempotency_key)
         with self:
             group_tx = self.session.get(Tx, group_tx_id)
-            assert group_tx.type == TxType.PENDING
+            if group_tx.type != TxType.PENDING:
+                raise ValueError("Transaction {group_tx_id} is not a Group ID.")
             obj = Tx(
                 idempotency_key=idempotency_key,
                 account_id=group_tx.account_id,
@@ -172,7 +173,9 @@ class Ledger(AutocommitSessionTransaction):
         assert amount, "automatic determination of amount is not yet supported"
         with self:
             group_tx = self.session.get(Tx, group_tx_id)
-            if group_tx.is_debit:
+            if group_tx.type != TxType.PENDING:
+                raise ValueError("Transaction {group_tx_id} is not a Group ID.")
+            if not group_tx.is_credit:
                 raise ValueError("Can only refund credit transaction.")
 
             obj = Tx(

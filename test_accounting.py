@@ -75,6 +75,26 @@ def andy_account_balance_is_100(ledger, db, andy, andy_new_account_tx_id):
 
 
 @fixture
+def andy_has_settled_credit_transaction(ledger, db, andy, andy_account_balance_is_100):
+    credit_tx_id = ledger.create_pending_transaction(
+        account_id=andy,
+        amount=Money(Decimal("-30")),
+        prev_tx_id=andy_account_balance_is_100,
+    )
+
+    settlement_tx_id = ledger.settle_transaction(
+        group_tx_id=credit_tx_id,
+        prev_tx_id=credit_tx_id,
+    )
+
+    with ledger:
+        settlement_tx = ledger.session.get(Tx, settlement_tx_id)
+        assert settlement_tx.current_balance == Decimal(70)
+        assert settlement_tx.available_balance == Decimal(70)
+    return settlement_tx_id
+
+
+@fixture
 def _bill(ledger):
     bill, prev_tx_id = ledger.create_account("bill")
     return bill, prev_tx_id
@@ -490,6 +510,25 @@ def test_settle_transaction(ledger, db, andy, andy_new_account_tx_id):
     )
 
 
+def test_settle_non_group_tx(
+    ledger: accounting.Ledger,
+    db,
+    andy: accounting.AccountId,
+    andy_new_account_tx_id: accounting.TransactionId,
+    andy_has_settled_credit_transaction,
+) -> None:
+    with ledger:
+        assert ledger.session.get(Tx, andy_has_settled_credit_transaction).type == TxType.SETTLEMENT
+
+    with assert_does_not_create_any_new_tx(ledger), \
+            raises(ValueError, match="is not a Group ID."):
+        refund_tx = ledger.settle_transaction(
+            group_tx_id=andy_has_settled_credit_transaction,
+            prev_tx_id=andy_has_settled_credit_transaction,
+        )
+
+
+
 def test_setting_prev_tx_balances_when_creating_and_settling_transactions(ledger, db, andy, andy_new_account_tx_id):
     tx1 = ledger.create_pending_transaction(
         account_id=andy,
@@ -565,6 +604,26 @@ def test_refund_pending_debit_transaction(
             group_tx_id=debit_tx,
             amount=Money(Decimal("20")),
         )
+
+
+def test_refund_non_group_tx(
+    ledger: accounting.Ledger,
+    db,
+    andy: accounting.AccountId,
+    andy_new_account_tx_id: accounting.TransactionId,
+    andy_has_settled_credit_transaction,
+) -> None:
+    with ledger:
+        assert ledger.session.get(Tx, andy_has_settled_credit_transaction).type == TxType.SETTLEMENT
+
+    with assert_does_not_create_any_new_tx(ledger), \
+            raises(ValueError, match="is not a Group ID."):
+        refund_tx = ledger.refund_pending_transaction(
+            group_tx_id=andy_has_settled_credit_transaction,
+            amount=Money(Decimal("20")),
+            prev_tx_id=andy_has_settled_credit_transaction,
+        )
+
 
 def test_refund_pending_credit_transaction(
     ledger: accounting.Ledger,
