@@ -140,6 +140,16 @@ class Tx(Base):
         # foreign key constraint
         CheckConstraint("current_balance >= 0", name="tx_positive_current_balance"),
         CheckConstraint("available_balance >= 0", name="tx_positive_available_balance"),
+        CheckConstraint("available_balance <= current_balance", name="tx_available_always_lt_current"),
+
+        # The expression `NOT (X) OR (Y)` is basically `IF (X) THEN (Y)`
+        CheckConstraint("NOT (type = 'NEW_ACCOUNT') OR (amount = 0 AND pending_amount = 0 AND current_balance = 0 AND available_balance = 0 AND prev_current_balance = 0 AND prev_available_balance = 0)", name="tx_new_account_starts_with_zero_balance"),
+        CheckConstraint("NOT (type = 'SETTLEMENT') OR (amount = pending_amount)", name="tx_pending_amount_equals_amount"),
+        CheckConstraint("NOT (type = 'PENDING' AND amount > 0) OR (pending_amount = amount AND current_balance = prev_current_balance AND available_balance = prev_available_balance)", name="tx_pending_debit_does_not_change_balance"),
+        CheckConstraint("NOT (type = 'PENDING' AND amount < 0) OR (pending_amount = amount AND current_balance = prev_current_balance AND available_balance = prev_available_balance + amount)", name="tx_pending_credit_reduces_available_balance"),
+        CheckConstraint("NOT (type = 'SETTLEMENT' AND amount > 0) OR (current_balance = prev_current_balance + pending_amount AND available_balance = prev_available_balance + pending_amount)", name="tx_refund_debit_increases_balances"),
+        CheckConstraint("NOT (type = 'SETTLEMENT' AND amount < 0) OR (current_balance = prev_current_balance + pending_amount AND available_balance = prev_available_balance)", name="tx_refund_credit_reduces_current_balance"),
+        CheckConstraint("NOT (type = 'REFUND') OR (amount > 0 AND pending_amount <= 0 AND pending_amount = group_prev_pending_amount + amount)", name="tx_refund_reduces_pending_amount"),
     )
 
     id: Mapped[bytes] = mapped_column(BYTEA(32), primary_key=True)
