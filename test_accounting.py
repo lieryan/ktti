@@ -1,5 +1,5 @@
 from decimal import Decimal
-from typing import Any
+from typing import Any, Optional, Iterator
 from contextlib import contextmanager
 from uuid import UUID, uuid4
 
@@ -112,7 +112,9 @@ def bill_new_account_tx_id(_bill) -> accounting.TransactionId:  # type: ignore[n
 
 
 @contextmanager
-def assert_does_not_create_any_new_tx(ledger):
+def assert_does_not_create_any_new_tx(
+    ledger: accounting.Ledger,
+) -> Iterator[None]:
     with ledger:
         start_count = ledger.session.execute(select(func.count(Tx.id))).scalar_one()
     yield
@@ -122,20 +124,23 @@ def assert_does_not_create_any_new_tx(ledger):
 
 
 def assert_tx_balances(
-    new_account_tx: Tx,
+    tx: Optional[Tx],
     *,
     current_balance: Decimal,
     available_balance: Decimal,
     prev_current_balance: Decimal,
     prev_available_balance: Decimal,
-):
-    assert new_account_tx.current_balance == current_balance
-    assert new_account_tx.available_balance == available_balance
-    assert new_account_tx.prev_current_balance == prev_current_balance
-    assert new_account_tx.prev_available_balance == prev_available_balance
+) -> None:
+    assert tx is not None
+    assert tx.current_balance == current_balance
+    assert tx.available_balance == available_balance
+    assert tx.prev_current_balance == prev_current_balance
+    assert tx.prev_available_balance == prev_available_balance
 
 
-def test_create_account(ledger):
+def test_create_account(
+    ledger: accounting.Ledger,
+) -> None:
     andy, new_account_tx_id = ledger.create_account("andy")
 
     account = ledger.session.execute(select(Account)).scalar_one()
@@ -158,7 +163,9 @@ def test_create_account(ledger):
     )
 
 
-def test_cannot_create_two_accounts_with_the_same_name(ledger):
+def test_cannot_create_two_accounts_with_the_same_name(
+    ledger: accounting.Ledger,
+) -> None:
     andy, new_account_tx_id = ledger.create_account("andy")
     with assert_does_not_create_any_new_tx(ledger), \
             raises(
@@ -168,7 +175,9 @@ def test_cannot_create_two_accounts_with_the_same_name(ledger):
         ledger.create_account("andy")
 
 
-def test_cannot_create_new_account_transaction_for_the_same_account(ledger):
+def test_cannot_create_new_account_transaction_for_the_same_account(
+    ledger: accounting.Ledger,
+) -> None:
     andy, new_account_tx_id = ledger.create_account("andy")
     with assert_does_not_create_any_new_tx(ledger), \
             raises(
@@ -195,10 +204,10 @@ def test_cannot_create_new_account_transaction_for_the_same_account(ledger):
 
 
 def test_create_pending_transaction_debit(
-    ledger,
-    andy,
-    andy_new_account_tx_id,
-):
+    ledger: accounting.Ledger,
+    andy: accounting.AccountId,
+    andy_new_account_tx_id: accounting.TransactionId,
+) -> None:
     tx = ledger.create_pending_transaction(
         account_id=andy,
         amount=Money(Decimal("50")),
@@ -226,11 +235,11 @@ def test_create_pending_transaction_debit(
 
 
 def test_create_pending_transaction_credit(
-    ledger,
-    andy,
-    andy_new_account_tx_id,
-    given_andy_account_balance_is_100,
-):
+    ledger: accounting.Ledger,
+    andy: accounting.AccountId,
+    andy_new_account_tx_id: accounting.TransactionId,
+    given_andy_account_balance_is_100: accounting.TransactionId,
+) -> None:
     pending_tx = ledger.create_pending_transaction(
         account_id=andy,
         amount=Money(Decimal("-50")),
@@ -238,6 +247,7 @@ def test_create_pending_transaction_credit(
     )
 
     obj = ledger.session.get(Tx, pending_tx)
+    assert obj is not None
     assert is_sha256_bytes(obj.id)
     assert obj.account.id == andy
     assert obj.type == TxType.PENDING
@@ -258,11 +268,11 @@ def test_create_pending_transaction_credit(
 
 
 def test_create_pending_transaction_credit_insufficient_fund(
-    ledger,
-    andy,
-    andy_new_account_tx_id,
-    given_andy_account_balance_is_100,
-):
+    ledger: accounting.Ledger,
+    andy: accounting.AccountId,
+    andy_new_account_tx_id: accounting.TransactionId,
+    given_andy_account_balance_is_100: accounting.TransactionId,
+) -> None:
     with assert_does_not_create_any_new_tx(ledger), \
             raises(
                 sqlalchemy.exc.IntegrityError,
@@ -295,10 +305,10 @@ def test_create_pending_transaction_with_explicit_idempotency_key(
 
 
 def test_cannot_create_transaction_with_duplicate_idempotency_key(
-    ledger,
-    andy,
-    andy_new_account_tx_id,
-):
+    ledger: accounting.Ledger,
+    andy: accounting.AccountId,
+    andy_new_account_tx_id: accounting.TransactionId,
+) -> None:
     idempotency_key = uuid4()
     tx = ledger.create_pending_transaction(
         idempotency_key=idempotency_key,
@@ -320,10 +330,10 @@ def test_cannot_create_transaction_with_duplicate_idempotency_key(
 
 
 def test_next_tx_prev_tx_relationships_are_correctly_linked(
-    ledger,
-    andy,
-    andy_new_account_tx_id,
-):
+    ledger: accounting.Ledger,
+    andy: accounting.AccountId,
+    andy_new_account_tx_id: accounting.TransactionId,
+) -> None:
     tx1 = ledger.create_pending_transaction(
         account_id=andy,
         amount=Money(Decimal("50")),
@@ -339,7 +349,7 @@ def test_next_tx_prev_tx_relationships_are_correctly_linked(
     andy_new_account_tx = ledger.session.get(Tx, andy_new_account_tx_id)
     t1 = ledger.session.get(Tx, tx1)
     t2 = ledger.session.get(Tx, tx2)
-
+    assert t1 is not None and t2 is not None
     assert t1.prev_tx == andy_new_account_tx
     assert t1.prev_tx_id == andy_new_account_tx_id
 
@@ -347,11 +357,11 @@ def test_next_tx_prev_tx_relationships_are_correctly_linked(
 
 
 def test_group_next_tx_group_prev_tx_relationships_are_correctly_linked(
-    ledger,
-    andy,
-    andy_new_account_tx_id,
-    given_andy_account_balance_is_100,
-):
+    ledger: accounting.Ledger,
+    andy: accounting.AccountId,
+    andy_new_account_tx_id: accounting.TransactionId,
+    given_andy_account_balance_is_100: accounting.TransactionId,
+) -> None:
     tx1 = ledger.create_pending_transaction(
         account_id=andy,
         amount=Money(Decimal("-50")),
@@ -388,6 +398,7 @@ def test_group_next_tx_group_prev_tx_relationships_are_correctly_linked(
     t4 = ledger.session.get(Tx, tx4)
     t5 = ledger.session.get(Tx, tx5)
 
+    assert t1 and t2 and t3 and t4 and t5
     assert t2.prev_tx == t1
     assert t2.prev_tx_id == tx1
 
@@ -405,11 +416,11 @@ def test_group_next_tx_group_prev_tx_relationships_are_correctly_linked(
 
 
 def test_cannot_create_pending_transaction_if_prev_tx_id_does_not_match_the_account_id(
-    ledger,
-    andy,
-    andy_new_account_tx_id,
-    bill,
-):
+    ledger: accounting.Ledger,
+    andy: accounting.AccountId,
+    andy_new_account_tx_id: accounting.TransactionId,
+    bill: accounting.AccountId,
+) -> None:
     with assert_does_not_create_any_new_tx(ledger), \
             raises(sqlalchemy.exc.IntegrityError, match='violates foreign key constraint "tx_account_id_prev_tx_id_fkey"'):
         tx = ledger.create_pending_transaction(
@@ -420,10 +431,10 @@ def test_cannot_create_pending_transaction_if_prev_tx_id_does_not_match_the_acco
 
 
 def test_prev_tx_id_cannot_be_empty_except_for_new_account_transaction(
-    ledger,
-    andy,
-    andy_new_account_tx_id,
-):
+    ledger: accounting.Ledger,
+    andy: accounting.AccountId,
+    andy_new_account_tx_id: accounting.TransactionId,
+) -> None:
     with assert_does_not_create_any_new_tx(ledger), \
             raises(sqlalchemy.exc.IntegrityError, match='new row for relation "tx" violates check constraint "tx_require_prev_tx_id"'):
         with ledger:
@@ -445,11 +456,11 @@ def test_prev_tx_id_cannot_be_empty_except_for_new_account_transaction(
 
 
 def test_group_prev_tx_id_cannot_be_empty_except_for_pending_and_new_account_transaction(
-    ledger,
-    andy,
-    andy_new_account_tx_id,
-    given_andy_account_balance_is_100,
-):
+    ledger: accounting.Ledger,
+    andy: accounting.AccountId,
+    andy_new_account_tx_id: accounting.TransactionId,
+    given_andy_account_balance_is_100: accounting.TransactionId,
+) -> None:
     tx1 = ledger.create_pending_transaction(
         account_id=andy,
         amount=Money(Decimal("-50")),
@@ -477,7 +488,11 @@ def test_group_prev_tx_id_cannot_be_empty_except_for_pending_and_new_account_tra
             ledger.session.add(new_tx)
 
 
-def test_settle_transaction(ledger, andy, andy_new_account_tx_id):
+def test_settle_transaction(
+    ledger: accounting.Ledger,
+    andy: accounting.AccountId,
+    andy_new_account_tx_id: accounting.TransactionId,
+) -> None:
     pending_tx_id = ledger.create_pending_transaction(
         account_id=andy,
         amount=Money(Decimal("30")),
@@ -490,6 +505,7 @@ def test_settle_transaction(ledger, andy, andy_new_account_tx_id):
     )
 
     settlement_tx = ledger.session.get(Tx, settlement_tx_id)
+    assert settlement_tx is not None
     assert is_sha256_bytes(settlement_tx.id)
     assert settlement_tx.account.id == andy
     assert settlement_tx.group_tx_id == pending_tx_id
@@ -551,7 +567,11 @@ def test_settle_non_group_tx(
 
 
 
-def test_setting_prev_tx_balances_when_creating_and_settling_transactions(ledger, andy, andy_new_account_tx_id):
+def test_setting_prev_tx_balances_when_creating_and_settling_transactions(
+    ledger: accounting.Ledger,
+    andy: accounting.AccountId,
+    andy_new_account_tx_id: accounting.TransactionId,
+) -> None:
     tx1 = ledger.create_pending_transaction(
         account_id=andy,
         amount=Money(Decimal("50")),
