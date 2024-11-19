@@ -233,7 +233,11 @@ class Tx(Base):
         return self.amount < 0
 
     def __repr__(self) -> str:
-        return f"<Tx {self.tx_hash.hex()} {self.type.name} account={self.account.name if self.account else self.account_id} amount={self.amount}>"
+        group_tx_short = (self.group_tx_id or b"").hex()[:10]
+        tx_hash_short = self.tx_hash.hex()[:10]
+        tx_type = self.type.name
+        account_name = self.account.name if self.account else self.account_id
+        return f"<Tx {group_tx_short}:{tx_hash_short} {tx_type} account={account_name} amount={self.amount} pending_amount={self.pending_amount} balances={self.current_balance},{self.available_balance},{self.prev_current_balance},{self.prev_available_balance}>"
 
 
 def connect():
