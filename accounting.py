@@ -53,13 +53,6 @@ class AutocommitSessionTransaction:
 ## API
 
 
-def ensure_idempotency_key(idempotency_key: Optional[UUID]) -> UUID:
-    if idempotency_key is None:
-        return uuid4()
-    else:
-        return idempotency_key
-
-
 class Ledger(AutocommitSessionTransaction):
     def create_account(
         self,
@@ -67,7 +60,7 @@ class Ledger(AutocommitSessionTransaction):
         *,
         idempotency_key: Optional[UUID] = None,
     ) -> tuple[AccountId, TransactionId]:
-        idempotency_key = ensure_idempotency_key(idempotency_key)
+        idempotency_key = self._ensure_idempotency_key(idempotency_key)
         with self:
             obj = Account(name=name)
 
@@ -102,8 +95,9 @@ class Ledger(AutocommitSessionTransaction):
         idempotency_key: Optional[UUID] = None,
         prev_tx_id: Optional[TransactionId] = None,
     ) -> TransactionId:
-        idempotency_key = ensure_idempotency_key(idempotency_key)
+        idempotency_key = self._ensure_idempotency_key(idempotency_key)
         with self:
+            prev_tx_id = self._ensure_prev_tx_id(account_id, prev_tx_id)
             obj = Tx(
                 idempotency_key=idempotency_key,
                 account_id=account_id,
@@ -132,9 +126,10 @@ class Ledger(AutocommitSessionTransaction):
         Reflect the transaction amount to the current balance, if
         group_tx_id already have a settled Tx, do nothing.
         """
-        idempotency_key = ensure_idempotency_key(idempotency_key)
+        idempotency_key = self._ensure_idempotency_key(idempotency_key)
         with self:
             group_tx = self._get_group_tx(group_tx_id)
+            prev_tx_id = self._ensure_prev_tx_id(AccountId(group_tx.account_id), prev_tx_id)
             obj = Tx(
                 idempotency_key=idempotency_key,
                 account_id=group_tx.account_id,
@@ -164,12 +159,13 @@ class Ledger(AutocommitSessionTransaction):
         prev_tx_id: Optional[TransactionId] = None,
     ) -> TransactionId:
         """If `amount` is provided, do a partial refund."""
-        idempotency_key = ensure_idempotency_key(idempotency_key)
+        idempotency_key = self._ensure_idempotency_key(idempotency_key)
         assert amount, "automatic determination of amount is not yet supported"
         if amount <= 0:
             raise ValueError("Refund amount must be positive")
         with self:
             group_tx = self._get_group_tx(group_tx_id)
+            prev_tx_id = self._ensure_prev_tx_id(AccountId(group_tx.account_id), prev_tx_id)
             if not group_tx.is_credit:
                 raise ValueError("Can only refund credit transaction.")
 
@@ -218,6 +214,23 @@ class Ledger(AutocommitSessionTransaction):
                 it = it.next_tx
 
         return list(iterate_sorted_chain(new_account_tx))
+
+    def _ensure_idempotency_key(self, idempotency_key: Optional[UUID]) -> UUID:
+        if idempotency_key is None:
+            return uuid4()
+        else:
+            return idempotency_key
+
+    def _ensure_prev_tx_id(
+        self,
+        account_id: AccountId,
+        prev_tx_id: Optional[TransactionId],
+    ) -> TransactionId:
+        if prev_tx_id is None:
+            tx = self.get_latest_transaction(account_id)
+            return TransactionId(tx.id)
+        else:
+            return prev_tx_id
 
     def _get_group_tx(self, group_tx_id: TransactionId) -> Tx:
         group_tx = self.session.get(Tx, group_tx_id)
