@@ -799,6 +799,26 @@ def test_refund_pending_credit_transaction(
     )
 
 
+def test_cannot_refund_negative_amount(
+    ledger: accounting.Ledger,
+    andy: accounting.AccountId,
+    andy_new_account_tx_id: accounting.TransactionId,
+    given_andy_account_balance_is_100: accounting.TransactionId,
+) -> None:
+    credit_tx_id = ledger.create_pending_transaction(
+        account_id=andy,
+        amount=Money(Decimal("-50")),
+        prev_tx_id=given_andy_account_balance_is_100,
+    )
+
+    with assert_does_not_create_any_new_tx(ledger), \
+            raises(ValueError, match="Refund amount must be positive"):
+        refund_tx_id = ledger.refund_pending_transaction(
+            group_tx_id=credit_tx_id,
+            amount=Money(Decimal("-20")),
+            prev_tx_id=credit_tx_id,
+        )
+
 def test_cannot_refund_more_than_pending_amount(
     ledger: accounting.Ledger,
     andy: accounting.AccountId,

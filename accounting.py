@@ -166,6 +166,8 @@ class Ledger(AutocommitSessionTransaction):
         """If `amount` is provided, do a partial refund."""
         idempotency_key = ensure_idempotency_key(idempotency_key)
         assert amount, "automatic determination of amount is not yet supported"
+        if amount <= 0:
+            raise ValueError("Refund amount must be positive")
         with self:
             group_tx = self._get_group_tx(group_tx_id)
             if not group_tx.is_credit:
