@@ -140,17 +140,6 @@ class Ledger(AutocommitSessionTransaction):
             self.session.flush()
             return TransactionId(obj.id)
 
-    def _add_to_group(self, obj, group_tx):
-        group_tx = self.session.get(Tx, group_tx.id)
-        if group_tx.type != TxType.PENDING:
-            raise ValueError("group_tx must be the pending transaction of the group")
-
-        group_latest_tx_id = self.get_latest_group_transaction(group_tx.id)
-        group_latest_tx = self.session.get(Tx, group_latest_tx_id)
-        obj.group_tx_id = group_tx.id
-        obj.group_prev_tx_id = group_latest_tx_id
-        obj.group_prev_pending_amount = group_latest_tx.pending_amount
-
     def refund_pending_transaction(
         self,
         idempotency_key: UUID,
@@ -208,6 +197,17 @@ class Ledger(AutocommitSessionTransaction):
                 it = it.next_tx
 
         return list(iterate_sorted_chain(new_account_tx))
+
+    def _add_to_group(self, obj, group_tx):
+        group_tx = self.session.get(Tx, group_tx.id)
+        if group_tx.type != TxType.PENDING:
+            raise ValueError("group_tx must be the pending transaction of the group")
+
+        group_latest_tx_id = self.get_latest_group_transaction(group_tx.id)
+        group_latest_tx = self.session.get(Tx, group_latest_tx_id)
+        obj.group_tx_id = group_tx.id
+        obj.group_prev_tx_id = group_latest_tx_id
+        obj.group_prev_pending_amount = group_latest_tx.pending_amount
 
     def get_latest_transaction(
         self,
