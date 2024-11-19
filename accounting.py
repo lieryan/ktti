@@ -142,7 +142,7 @@ class Ledger(AutocommitSessionTransaction):
             )
             obj._set_prev_tx(self.session.get(Tx, prev_tx_id))
             self._add_to_group(obj, group_tx)
-            group_latest_tx_id = self.get_latest_group_transaction(group_tx_id)
+            group_latest_tx_id = self.get_latest_group_transaction(group_tx)
             group_latest_tx = self.session.get(Tx, group_latest_tx_id)
             assert group_latest_tx is not None
             settled_amount = group_latest_tx.pending_amount
@@ -230,7 +230,7 @@ class Ledger(AutocommitSessionTransaction):
         if group_tx.type != TxType.PENDING:
             raise ValueError("group_tx must be the pending transaction of the group")
 
-        group_latest_tx_id = self.get_latest_group_transaction(TransactionId(group_tx.id))
+        group_latest_tx_id = self.get_latest_group_transaction(group_tx)
         group_latest_tx = self.session.get(Tx, group_latest_tx_id)
         assert group_latest_tx is not None
         obj.group_tx_id = group_tx.id
@@ -253,7 +253,7 @@ class Ledger(AutocommitSessionTransaction):
 
     def get_latest_group_transaction(
         self,
-        group_tx_id: TransactionId,
+        group_tx: Tx,
     ) -> TransactionId:
         """Find the Tx in the Tx group that is never referenced by other
         Tx.group_prev_tx_id, this is always the latest Tx for that group"""
@@ -261,10 +261,9 @@ class Ledger(AutocommitSessionTransaction):
         #        slow if there's a lot of transactions in the account.
         #        We would need to record the head of the log in the accounts
         #        table to optimize this lookup.
-        group_tx = self.session.get(Tx, group_tx_id)
         assert group_tx is not None and group_tx.type == TxType.PENDING
-        tx_ids = set(self.session.execute(select(Tx.id).where(Tx.group_tx_id == group_tx_id)).scalars())
-        prev_tx_ids = set(self.session.execute(select(Tx.group_prev_tx_id).where(Tx.group_tx_id == group_tx_id)).scalars())
+        tx_ids = set(self.session.execute(select(Tx.id).where(Tx.group_tx_id == group_tx.id)).scalars())
+        prev_tx_ids = set(self.session.execute(select(Tx.group_prev_tx_id).where(Tx.group_tx_id == group_tx.id)).scalars())
         latest_tx, = tx_ids - prev_tx_ids
         return TransactionId(latest_tx)
 
