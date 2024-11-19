@@ -148,7 +148,6 @@ class Ledger(AutocommitSessionTransaction):
             settled_amount = group_latest_tx.pending_amount
             obj.amount = settled_amount
             obj.pending_amount = settled_amount
-            obj.group_prev_pending_amount = group_latest_tx.pending_amount
             obj.current_balance += settled_amount
             if group_tx.is_debit:
                 obj.available_balance += settled_amount
