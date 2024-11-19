@@ -55,7 +55,7 @@ def andy_new_account_tx_id(_andy):
 
 
 @fixture
-def andy_account_balance_is_100(ledger, db, andy, andy_new_account_tx_id):
+def given_andy_account_balance_is_100(ledger, db, andy, andy_new_account_tx_id):
     debit_tx_id = ledger.create_pending_transaction(
         account_id=andy,
         amount=Money(Decimal("100")),
@@ -75,11 +75,11 @@ def andy_account_balance_is_100(ledger, db, andy, andy_new_account_tx_id):
 
 
 @fixture
-def andy_has_settled_credit_transaction(ledger, db, andy, andy_account_balance_is_100):
+def given_andy_has_settled_credit_transaction(ledger, db, andy, given_andy_account_balance_is_100):
     credit_tx_id = ledger.create_pending_transaction(
         account_id=andy,
         amount=Money(Decimal("-30")),
-        prev_tx_id=andy_account_balance_is_100,
+        prev_tx_id=given_andy_account_balance_is_100,
     )
 
     settlement_tx_id = ledger.settle_transaction(
@@ -233,14 +233,14 @@ def test_create_pending_transaction_credit(
     db,
     andy,
     andy_new_account_tx_id,
-    andy_account_balance_is_100,
+    given_andy_account_balance_is_100,
 ):
     idempotency_key = uuid4()
     pending_tx = ledger.create_pending_transaction(
         idempotency_key=idempotency_key,
         account_id=andy,
         amount=Money(Decimal("-50")),
-        prev_tx_id=andy_account_balance_is_100,
+        prev_tx_id=given_andy_account_balance_is_100,
     )
 
     obj = ledger.session.get(Tx, pending_tx)
@@ -251,7 +251,7 @@ def test_create_pending_transaction_credit(
     assert obj.amount == Money(Decimal("-50"))
     assert obj.pending_amount == Money(Decimal("-50"))
 
-    assert obj.prev_tx_id == andy_account_balance_is_100
+    assert obj.prev_tx_id == given_andy_account_balance_is_100
     assert_tx_balances(
         obj,
         current_balance=Money(Decimal(100)),
@@ -269,7 +269,7 @@ def test_create_pending_transaction_credit_insufficient_fund(
     db,
     andy,
     andy_new_account_tx_id,
-    andy_account_balance_is_100,
+    given_andy_account_balance_is_100,
 ):
     idempotency_key = uuid4()
     with assert_does_not_create_any_new_tx(ledger), \
@@ -281,7 +281,7 @@ def test_create_pending_transaction_credit_insufficient_fund(
             idempotency_key=idempotency_key,
             account_id=andy,
             amount=Money(Decimal("-150")),
-            prev_tx_id=andy_account_balance_is_100,
+            prev_tx_id=given_andy_account_balance_is_100,
         )
 
 
@@ -344,12 +344,12 @@ def test_group_next_tx_group_prev_tx_relationships_are_correctly_linked(
     db,
     andy,
     andy_new_account_tx_id,
-    andy_account_balance_is_100,
+    given_andy_account_balance_is_100,
 ):
     tx1 = ledger.create_pending_transaction(
         account_id=andy,
         amount=Money(Decimal("-50")),
-        prev_tx_id=andy_account_balance_is_100,
+        prev_tx_id=given_andy_account_balance_is_100,
     )
 
     tx2 = ledger.refund_pending_transaction(
@@ -445,12 +445,12 @@ def test_group_prev_tx_id_cannot_be_empty_except_for_pending_and_new_account_tra
     db,
     andy,
     andy_new_account_tx_id,
-    andy_account_balance_is_100,
+    given_andy_account_balance_is_100,
 ):
     tx1 = ledger.create_pending_transaction(
         account_id=andy,
         amount=Money(Decimal("-50")),
-        prev_tx_id=andy_account_balance_is_100,
+        prev_tx_id=given_andy_account_balance_is_100,
     )
 
     with assert_does_not_create_any_new_tx(ledger), \
@@ -515,16 +515,16 @@ def test_settle_non_group_tx(
     db,
     andy: accounting.AccountId,
     andy_new_account_tx_id: accounting.TransactionId,
-    andy_has_settled_credit_transaction,
+    given_andy_has_settled_credit_transaction,
 ) -> None:
     with ledger:
-        assert ledger.session.get(Tx, andy_has_settled_credit_transaction).type == TxType.SETTLEMENT
+        assert ledger.session.get(Tx, given_andy_has_settled_credit_transaction).type == TxType.SETTLEMENT
 
     with assert_does_not_create_any_new_tx(ledger), \
             raises(ValueError, match="is not a Group ID."):
         refund_tx = ledger.settle_transaction(
-            group_tx_id=andy_has_settled_credit_transaction,
-            prev_tx_id=andy_has_settled_credit_transaction,
+            group_tx_id=given_andy_has_settled_credit_transaction,
+            prev_tx_id=given_andy_has_settled_credit_transaction,
         )
 
 
@@ -590,12 +590,12 @@ def test_refund_pending_debit_transaction(
     db,
     andy: accounting.AccountId,
     andy_new_account_tx_id: accounting.TransactionId,
-    andy_account_balance_is_100,
+    given_andy_account_balance_is_100,
 ) -> None:
     debit_tx = ledger.create_pending_transaction(
         account_id=andy,
         amount=Money(Decimal("50")),
-        prev_tx_id=andy_account_balance_is_100,
+        prev_tx_id=given_andy_account_balance_is_100,
     )
 
     with assert_does_not_create_any_new_tx(ledger), \
@@ -611,17 +611,17 @@ def test_refund_non_group_tx(
     db,
     andy: accounting.AccountId,
     andy_new_account_tx_id: accounting.TransactionId,
-    andy_has_settled_credit_transaction,
+    given_andy_has_settled_credit_transaction,
 ) -> None:
     with ledger:
-        assert ledger.session.get(Tx, andy_has_settled_credit_transaction).type == TxType.SETTLEMENT
+        assert ledger.session.get(Tx, given_andy_has_settled_credit_transaction).type == TxType.SETTLEMENT
 
     with assert_does_not_create_any_new_tx(ledger), \
             raises(ValueError, match="is not a Group ID."):
         refund_tx = ledger.refund_pending_transaction(
-            group_tx_id=andy_has_settled_credit_transaction,
+            group_tx_id=given_andy_has_settled_credit_transaction,
             amount=Money(Decimal("20")),
-            prev_tx_id=andy_has_settled_credit_transaction,
+            prev_tx_id=given_andy_has_settled_credit_transaction,
         )
 
 
@@ -630,12 +630,12 @@ def test_refund_pending_credit_transaction(
     db,
     andy: accounting.AccountId,
     andy_new_account_tx_id: accounting.TransactionId,
-    andy_account_balance_is_100,
+    given_andy_account_balance_is_100,
 ) -> None:
     credit_tx_id = ledger.create_pending_transaction(
         account_id=andy,
         amount=Money(Decimal("-50")),
-        prev_tx_id=andy_account_balance_is_100,
+        prev_tx_id=given_andy_account_balance_is_100,
     )
 
     refund_tx_id = ledger.refund_pending_transaction(
