@@ -590,48 +590,75 @@ def test_refund_pending_credit_transaction(
     andy_new_account_tx_id: accounting.TransactionId,
     andy_account_balance_is_100,
 ) -> None:
-    credit_tx = ledger.create_pending_transaction(
+    credit_tx_id = ledger.create_pending_transaction(
         idempotency_key=uuid4(),
         account_id=andy,
         amount=Money(Decimal("-50")),
         prev_tx_id=andy_account_balance_is_100,
     )
 
-    refund_tx = ledger.refund_pending_transaction(
+    refund_tx_id = ledger.refund_pending_transaction(
         idempotency_key=uuid4(),
-        group_tx_id=credit_tx,
+        group_tx_id=credit_tx_id,
         amount=Money(Decimal("20")),
-        prev_tx_id=credit_tx,
+        prev_tx_id=credit_tx_id,
     )
 
-    settlement_tx = ledger.settle_transaction(
+    refund2_tx_id = ledger.refund_pending_transaction(
         idempotency_key=uuid4(),
-        group_tx_id=credit_tx,
-        prev_tx_id=refund_tx,
+        group_tx_id=credit_tx_id,
+        amount=Money(Decimal("12")),
+        prev_tx_id=refund_tx_id,
     )
 
+    settlement_tx_id = ledger.settle_transaction(
+        idempotency_key=uuid4(),
+        group_tx_id=credit_tx_id,
+        prev_tx_id=refund2_tx_id,
+    )
+
+    credit_tx = ledger.session.get(Tx, credit_tx_id)
+    assert credit_tx.amount == Money(Decimal("-50"))
+    assert credit_tx.pending_amount == Money(Decimal("-50"))
     assert_tx_balances(
-        ledger.session.get(Tx, credit_tx),
+        credit_tx,
         prev_current_balance=Decimal("100"),
         prev_available_balance=Decimal("100"),
         current_balance=Decimal("100"),
         available_balance=Decimal("50"),
     )
 
+    refund_tx = ledger.session.get(Tx, refund_tx_id)
+    assert refund_tx.amount == Money(Decimal("20"))
+    assert refund_tx.pending_amount == Money(Decimal("-30"))
     assert_tx_balances(
-        ledger.session.get(Tx, refund_tx),
+        refund_tx,
         prev_current_balance=Decimal("100"),
         prev_available_balance=Decimal("50"),
         current_balance=Decimal("100"),
         available_balance=Decimal("70"),
     )
 
+    refund2_tx = ledger.session.get(Tx, refund2_tx_id)
+    assert refund2_tx.amount == Money(Decimal("12"))
+    assert refund2_tx.pending_amount == Money(Decimal("-18"))
     assert_tx_balances(
-        ledger.session.get(Tx, settlement_tx),
+        refund2_tx,
         prev_current_balance=Decimal("100"),
         prev_available_balance=Decimal("70"),
-        current_balance=Decimal("70"),
-        available_balance=Decimal("70"),
+        current_balance=Decimal("100"),
+        available_balance=Decimal("82"),
+    )
+
+    settlement_tx = ledger.session.get(Tx, settlement_tx_id)
+    assert settlement_tx.amount == Money(Decimal("-18"))
+    assert settlement_tx.pending_amount == Money(Decimal("-18"))
+    assert_tx_balances(
+        settlement_tx,
+        prev_current_balance=Decimal("100"),
+        prev_available_balance=Decimal("82"),
+        current_balance=Decimal("82"),
+        available_balance=Decimal("82"),
     )
 
 

@@ -97,7 +97,6 @@ class Ledger(AutocommitSessionTransaction):
                 type=TxType.PENDING,
                 amount=amount,
                 pending_amount=amount,
-                group_prev_pending_amount=Money(Decimal("0")),
             )
             obj._set_prev_tx(self.session.get(Tx, prev_tx_id))
             if obj.is_credit:
@@ -121,19 +120,23 @@ class Ledger(AutocommitSessionTransaction):
         """
         with self:
             group_tx = self.session.get(Tx, group_tx_id)
-            settled_amount = group_tx.amount  # TODO: calculate settled amount
+            assert group_tx.type == TxType.PENDING
             obj = Tx(
                 idempotency_key=idempotency_key,
                 account_id=group_tx.account_id,
                 type=TxType.SETTLEMENT,
-                amount=settled_amount,
-                pending_amount=settled_amount,
-                group_prev_pending_amount=Money(Decimal(0)),
             )
+            group_latest_tx_id = self.get_latest_group_transaction(group_tx.id)
+            group_latest_tx = self.session.get(Tx, group_latest_tx_id)
+            settled_amount = group_latest_tx.pending_amount  # TODO: calculate settled amount
+            obj.amount = settled_amount
+            obj.pending_amount = settled_amount
+            obj.group_prev_pending_amount = group_latest_tx.pending_amount
             obj._set_prev_tx(self.session.get(Tx, prev_tx_id))
             self._add_to_group(obj, group_tx)
             obj.current_balance += settled_amount
-            obj.available_balance += settled_amount
+            if group_tx.is_debit:
+                obj.available_balance += settled_amount
             obj._set_transaction_hash()
 
             self.session.add(obj)
@@ -159,10 +162,10 @@ class Ledger(AutocommitSessionTransaction):
                 account_id=group_tx.account_id,
                 type=TxType.REFUND,
                 amount=amount,
-                pending_amount=amount,
             )
             obj._set_prev_tx(self.session.get(Tx, prev_tx_id))
             self._add_to_group(obj, group_tx)
+            obj.pending_amount = obj.group_prev_pending_amount + amount
             obj.available_balance += amount
             obj._set_transaction_hash()
 

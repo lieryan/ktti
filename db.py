@@ -210,6 +210,7 @@ class Tx(Base):
     def _set_group_tx_root(self) -> None:
         self.group_tx_id = self.id
         self.group_prev_tx_id = None
+        self.group_prev_pending_amount = Decimal("0")
         
     @property
     def tx_hash(self) -> bytes:
