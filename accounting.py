@@ -134,11 +134,7 @@ class Ledger(AutocommitSessionTransaction):
         """
         idempotency_key = ensure_idempotency_key(idempotency_key)
         with self:
-            group_tx = self.session.get(Tx, group_tx_id)
-            if group_tx is None:
-                raise ValueError(f"Transaction group {group_tx_id!r} does not exist.")
-            if group_tx.type != TxType.PENDING:
-                raise ValueError(f"Transaction {group_tx_id!r} is not a Group ID.")
+            group_tx = self._get_group_tx(group_tx_id)
             obj = Tx(
                 idempotency_key=idempotency_key,
                 account_id=group_tx.account_id,
@@ -173,11 +169,7 @@ class Ledger(AutocommitSessionTransaction):
         idempotency_key = ensure_idempotency_key(idempotency_key)
         assert amount, "automatic determination of amount is not yet supported"
         with self:
-            group_tx = self.session.get(Tx, group_tx_id)
-            if group_tx is None:
-                raise ValueError(f"Transaction group {group_tx_id!r} does not exist.")
-            if group_tx.type != TxType.PENDING:
-                raise ValueError(f"Transaction {group_tx_id!r} is not a Group ID.")
+            group_tx = self._get_group_tx(group_tx_id)
             if not group_tx.is_credit:
                 raise ValueError("Can only refund credit transaction.")
 
@@ -224,6 +216,14 @@ class Ledger(AutocommitSessionTransaction):
                 it = it.next_tx
 
         return list(iterate_sorted_chain(new_account_tx))
+
+    def _get_group_tx(self, group_tx_id: TransactionId) -> Tx:
+        group_tx = self.session.get(Tx, group_tx_id)
+        if group_tx is None:
+            raise ValueError(f"Transaction group {group_tx_id!r} does not exist.")
+        if group_tx.type != TxType.PENDING:
+            raise ValueError(f"Transaction {group_tx_id!r} is not a Group ID.")
+        return group_tx
 
     def _add_to_group(self, obj, group_tx):
         group_tx = self.session.get(Tx, group_tx.id)
