@@ -56,7 +56,11 @@ def andy_new_account_tx_id(_andy) -> accounting.TransactionId:  # type: ignore[n
 
 
 @fixture
-def given_andy_account_balance_is_100(ledger, andy, andy_new_account_tx_id):
+def given_andy_account_balance_is_100(
+    ledger: accounting.Ledger,
+    andy: accounting.AccountId,
+    andy_new_account_tx_id: accounting.TransactionId,
+) -> accounting.TransactionId:
     debit_tx_id = ledger.create_pending_transaction(
         account_id=andy,
         amount=Money(Decimal("100")),
@@ -69,6 +73,7 @@ def given_andy_account_balance_is_100(ledger, andy, andy_new_account_tx_id):
 
     with ledger:
         settlement_tx = ledger.session.get(Tx, settlement_tx_id)
+        assert settlement_tx is not None
         assert settlement_tx.current_balance == Decimal(100)
         assert settlement_tx.available_balance == Decimal(100)
 
@@ -76,20 +81,39 @@ def given_andy_account_balance_is_100(ledger, andy, andy_new_account_tx_id):
 
 
 @fixture
-def given_andy_has_pending_credit_transaction(ledger, andy, given_andy_account_balance_is_100):
+def given_andy_has_pending_credit_transaction(
+    ledger: accounting.Ledger,
+    andy: accounting.AccountId,
+    given_andy_account_balance_is_100: accounting.TransactionId,
+) -> accounting.TransactionId:
     credit_tx_id = ledger.create_pending_transaction(
         account_id=andy,
         amount=Money(Decimal("-30")),
         prev_tx_id=given_andy_account_balance_is_100,
     )
 
+    with ledger:
+        settlement_tx = ledger.session.get(Tx, credit_tx_id)
+        assert settlement_tx is not None
+        assert settlement_tx.current_balance == Decimal(100)
+        assert settlement_tx.available_balance == Decimal(70)
+    return credit_tx_id
+
+
+@fixture
+def given_andy_has_settled_credit_transaction(
+    ledger: accounting.Ledger,
+    andy: accounting.AccountId,
+    given_andy_has_pending_credit_transaction: accounting.TransactionId,
+) -> accounting.TransactionId:
     settlement_tx_id = ledger.settle_transaction(
-        group_tx_id=credit_tx_id,
-        prev_tx_id=credit_tx_id,
+        group_tx_id=given_andy_has_pending_credit_transaction,
+        prev_tx_id=given_andy_has_pending_credit_transaction,
     )
 
     with ledger:
         settlement_tx = ledger.session.get(Tx, settlement_tx_id)
+        assert settlement_tx is not None
         assert settlement_tx.current_balance == Decimal(70)
         assert settlement_tx.available_balance == Decimal(70)
     return settlement_tx_id
@@ -547,6 +571,20 @@ def test_settle_transaction_with_explicit_idempotency_key(
     assert settlement_tx.idempotency_key == explicit_idempotency_key
 
 
+def test_settle_transaction_with_nonexistent_group_tx(
+    ledger: accounting.Ledger,
+    andy: accounting.AccountId,
+    andy_new_account_tx_id: accounting.TransactionId,
+) -> None:
+    nonexistent_tx_id = accounting.TransactionId(b"nonexistent")
+    with assert_does_not_create_any_new_tx(ledger), \
+            raises(ValueError, match="Transaction group .* does not exist."):
+        settlement_tx_id = ledger.settle_transaction(
+            group_tx_id=nonexistent_tx_id,
+            prev_tx_id=nonexistent_tx_id,
+        )
+
+
 def test_settle_non_group_tx(
     ledger: accounting.Ledger,
     andy: accounting.AccountId,
@@ -643,6 +681,21 @@ def test_refund_pending_debit_transaction(
             raises(ValueError, match="Can only refund credit transaction."):
         refund_tx = ledger.refund_pending_transaction(
             group_tx_id=debit_tx,
+            amount=Money(Decimal("20")),
+        )
+
+
+def test_refund_with_nonexistent_group_tx(
+    ledger: accounting.Ledger,
+    andy: accounting.AccountId,
+    andy_new_account_tx_id: accounting.TransactionId,
+    given_andy_has_pending_credit_transaction: accounting.TransactionId,
+) -> None:
+    nonexistent_tx_id = accounting.TransactionId(b"nonexistent")
+    with assert_does_not_create_any_new_tx(ledger), \
+            raises(ValueError, match="Transaction group .* does not exist."):
+        settlement_tx_id = ledger.refund_pending_transaction(
+            group_tx_id=nonexistent_tx_id,
             amount=Money(Decimal("20")),
         )
 
