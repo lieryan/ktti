@@ -142,9 +142,7 @@ class Ledger(AutocommitSessionTransaction):
             )
             obj._set_prev_tx(self.session.get(Tx, prev_tx_id))
             self._add_to_group(obj, group_tx)
-            group_latest_tx_id = self.get_latest_group_transaction(group_tx)
-            group_latest_tx = self.session.get(Tx, group_latest_tx_id)
-            assert group_latest_tx is not None
+            group_latest_tx = self.get_latest_group_transaction(group_tx)
             settled_amount = group_latest_tx.pending_amount
             obj.amount = settled_amount
             obj.pending_amount = settled_amount
@@ -194,8 +192,7 @@ class Ledger(AutocommitSessionTransaction):
         self,
         account_id: AccountId,
     ) -> Balance:
-        tx = self.session.get(Tx, self.get_latest_transaction(account_id))
-        assert tx is not None
+        tx = self.get_latest_transaction(account_id)
         return Balance(
             current=Money(tx.current_balance),
             available=Money(tx.available_balance),
@@ -232,17 +229,16 @@ class Ledger(AutocommitSessionTransaction):
         if group_tx.type != TxType.PENDING:
             raise ValueError("group_tx must be the pending transaction of the group")
 
-        group_latest_tx_id = self.get_latest_group_transaction(group_tx)
-        group_latest_tx = self.session.get(Tx, group_latest_tx_id)
+        group_latest_tx = self.get_latest_group_transaction(group_tx)
         assert group_latest_tx is not None
         obj.group_tx_id = group_tx.id
-        obj.group_prev_tx_id = group_latest_tx_id
+        obj.group_prev_tx_id = group_latest_tx.id
         obj.group_prev_pending_amount = group_latest_tx.pending_amount
 
     def get_latest_transaction(
         self,
         account_id: AccountId,
-    ) -> TransactionId:
+    ) -> Tx:
         """Find the Tx that is never referenced by other Tx.prev_id, this is always the latest Tx"""
         # FIXME: Calculating the head of the transactions in this way can be
         #        slow if there's a lot of transactions in the account.
@@ -251,12 +247,14 @@ class Ledger(AutocommitSessionTransaction):
         tx_ids = set(self.session.execute(select(Tx.id).where(Tx.account_id == account_id)).scalars())
         prev_tx_ids = set(self.session.execute(select(Tx.prev_tx_id).where(Tx.account_id == account_id)).scalars())
         latest_tx, = tx_ids - prev_tx_ids
-        return TransactionId(latest_tx)
+        tx = self.session.get(Tx, latest_tx)
+        assert tx is not None
+        return tx
 
     def get_latest_group_transaction(
         self,
         group_tx: Tx,
-    ) -> TransactionId:
+    ) -> Tx:
         """Find the Tx in the Tx group that is never referenced by other
         Tx.group_prev_tx_id, this is always the latest Tx for that group"""
         # FIXME: Calculating the head of the transactions in this way can be
@@ -267,7 +265,9 @@ class Ledger(AutocommitSessionTransaction):
         tx_ids = set(self.session.execute(select(Tx.id).where(Tx.group_tx_id == group_tx.id)).scalars())
         prev_tx_ids = set(self.session.execute(select(Tx.group_prev_tx_id).where(Tx.group_tx_id == group_tx.id)).scalars())
         latest_tx, = tx_ids - prev_tx_ids
-        return TransactionId(latest_tx)
+        tx = self.session.get(Tx, latest_tx)
+        assert tx is not None
+        return tx
 
     ### UI
 

@@ -799,10 +799,12 @@ def test_refund_pending_credit_transaction(
 
 
 def test_list_transactions(
-    ledger,
-    andy, andy_new_account_tx_id,
-    bill, bill_new_account_tx_id,
-):
+    ledger: accounting.Ledger,
+    andy: accounting.AccountId,
+    andy_new_account_tx_id: accounting.TransactionId,
+    bill: accounting.AccountId,
+    bill_new_account_tx_id: accounting.TransactionId,
+) -> None:
     tx1 = ledger.create_pending_transaction(
         account_id=andy,
         amount=Money(Decimal("50")),
@@ -843,10 +845,10 @@ def test_list_transactions(
 
 
 def test_get_latest_transaction(
-    ledger,
-    andy,
-    andy_new_account_tx_id,
-):
+    ledger: accounting.Ledger,
+    andy: accounting.AccountId,
+    andy_new_account_tx_id: accounting.TransactionId,
+) -> None:
     tx1 = ledger.create_pending_transaction(
         account_id=andy,
         amount=Money(Decimal("50")),
@@ -872,7 +874,8 @@ def test_get_latest_transaction(
 
     latest_tx = ledger.get_latest_transaction(andy)
 
-    assert latest_tx == tx4
+    assert isinstance(latest_tx, Tx)
+    assert latest_tx.id == tx4
 
 
 def test_get_balance(
