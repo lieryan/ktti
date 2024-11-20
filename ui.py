@@ -81,6 +81,10 @@ If-Match request header when used with a verb that mutates a stateful resource:
     ERROR: (psycopg.errors.UniqueViolation) duplicate key value violates unique constraint "tx_prev_tx_id_key"
 
 
+To print balance and list recorded transactions:
+
+    In [15]: print_account_summmary()
+    In [16]: print_transactions()
 
 ''' + CLEAR
 
@@ -148,7 +152,7 @@ def _create_pending_transaction(amount: Decimal | float | int, **kwargs: Any) ->
     return tx_id.hex()
 
 
-def _validate_kwargs(kwargs):
+def _validate_kwargs(kwargs: dict[str, Any]) -> None:
     if 'prev_tx_id' in kwargs:
         kwargs["prev_tx_id"] = accounting.TransactionId(bytes.fromhex(kwargs["prev_tx_id"]))
 
