@@ -12,6 +12,11 @@
 3. Install dependencies: pip install -r requirements.txt
 4. Run databases: sudo docker compose up -d
 
+## Usage
+
+```
+$ python ui.py
+```
 
 ## Design rationale
 

@@ -113,7 +113,7 @@ class Ledger(AutocommitSessionTransaction):
             if obj.is_credit:
                 obj.available_balance += amount
             if obj.available_balance < 0:
-                raise Ledger.InsufficientFund()
+                raise Ledger.InsufficientFund("Insufficient fund")
 
             obj._set_transaction_hash()
             obj._set_group_tx_root()
