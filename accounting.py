@@ -85,6 +85,7 @@ class Ledger(AutocommitSessionTransaction):
                 current_balance=0,
                 available_balance=0,
             )
+
             new_account_tx._set_transaction_hash()
             self.session.add(new_account_tx)
 
@@ -113,12 +114,12 @@ class Ledger(AutocommitSessionTransaction):
                 obj.available_balance += amount
             if obj.available_balance < 0:
                 raise Ledger.InsufficientFund()
+
             obj._set_transaction_hash()
             obj._set_group_tx_root()
-
             self.session.add(obj)
             self.session.flush()
-            return TransactionId(obj.id)
+            return TransactionId(obj.tx_hash)
 
     def settle_transaction(
         self,
@@ -149,11 +150,11 @@ class Ledger(AutocommitSessionTransaction):
             obj.current_balance += settled_amount
             if group_tx.is_debit:
                 obj.available_balance += settled_amount
-            obj._set_transaction_hash()
 
+            obj._set_transaction_hash()
             self.session.add(obj)
             self.session.flush()
-            return TransactionId(obj.id)
+            return TransactionId(obj.tx_hash)
 
     def refund_pending_transaction(
         self,
@@ -184,11 +185,11 @@ class Ledger(AutocommitSessionTransaction):
             self._add_to_group(obj, group_tx)
             obj.pending_amount = obj.group_prev_pending_amount + amount
             obj.available_balance += amount
-            obj._set_transaction_hash()
 
+            obj._set_transaction_hash()
             self.session.add(obj)
             self.session.flush()
-            return TransactionId(obj.id)
+            return TransactionId(obj.tx_hash)
 
 
     def get_balance(
@@ -233,7 +234,7 @@ class Ledger(AutocommitSessionTransaction):
     ) -> TransactionId:
         if prev_tx_id is None:
             tx = self.get_latest_transaction(account_id)
-            return TransactionId(tx.id)
+            return TransactionId(tx.tx_hash)
         else:
             return prev_tx_id
 

@@ -23,7 +23,9 @@
    this assignment.
 
 2. I've decided to model debit and credit transactions as positive and negative
-   value in the amount fields for simplicity. 
+   value in the amount fields for simplicity. This may not always be the best
+   way to model debit and credit in a ledger, but it's good enough for this
+   purpose.
 
 3. Money type with Decimal. In production application, I'd have used a Money
    class to handle currencies explicitly in the system.
@@ -58,6 +60,10 @@
 7. The ledger supports optional optimistic locking with prev_tx_id. The client
    can pass the ID of the last transaction it knew about to ensure that the
    request is only processed if there wasn't any other concurrent transactions.
+
+8. In production scenario, you would have wanted to version tx_hash so that you
+   can still verify hashes of old transactions if their calculation logic
+   changes.
 
 
 ## Caveats

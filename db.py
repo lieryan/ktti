@@ -221,9 +221,25 @@ class Tx(Base):
         # adding prev_tx_id into the hashed data means that alterations to
         # previous transaction entries would cause the hashes to become
         # invalid.
-        data = f"{(self.prev_tx_id or b'').hex()}|{self.idempotency_key}|{self.account_id}|{self.type}|{Decimal(self.amount).normalize()}"
-        tx_hash = sha256(data.encode("ascii")).digest()
-        assert self.id is None or self.id == tx_hash
+        data: dict[str, str] = dict(
+            idempotency_key=str(self.idempotency_key),
+            account_id=str(self.account_id),
+            type=str(self.type),
+            amount=str(Decimal(self.amount).normalize()),
+            pending_amount=str(Decimal(self.pending_amount).normalize()),
+            prev_tx_id=(self.prev_tx_id or b'').hex(),
+            group_prev_tx_id=(self.group_prev_tx_id or b'').hex(),
+            prev_current_balance=str(Decimal(self.prev_current_balance).normalize()),
+            prev_available_balance=str(Decimal(self.prev_available_balance).normalize()),
+            current_balance=str(Decimal(self.current_balance).normalize()),
+            available_balance=str(Decimal(self.available_balance).normalize()),
+        )
+        if self.type not in (TxType.NEW_ACCOUNT, TxType.PENDING):
+            group_tx_id=(self.group_tx_id or b'').hex(),
+        serialized = "\n".join([f"{key}={value}" for key, value in sorted(data.items())])
+        tx_hash = sha256(serialized.encode("ascii")).digest()
+        if self.id is not None:
+            assert self.id == tx_hash
         return tx_hash
 
     @property
