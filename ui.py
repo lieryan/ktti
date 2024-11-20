@@ -1,4 +1,5 @@
 import accounting
+from uuid import uuid4
 from typing import Callable, Any, TypeVar
 from functools import wraps
 import db
@@ -51,6 +52,36 @@ To create and partially refund a credit transaction:
     In [8]: settle_transaction(tx1)
     Working on jim accounts. jim has 7 transaction(s).
     Current balance: $85   Available balance: $85
+
+You can also use idempotency_key argument to let the ledger detect duplicate transactions:
+
+    In [9]: ik = uuid4()
+    In [10]: create_debit_transaction(30, idempotency_key=ik)
+    Working on jim accounts. jim has 16 transaction(s).
+    Current balance: $145   Available balance: $85
+    Out[10]: '2b251dba19244f51f75ed52c9aa2b1c1bd98b75443c4b73d8e37845c68cc195f'
+
+    In [11]: create_debit_transaction(30, idempotency_key=ik)
+    ERROR: (psycopg.errors.UniqueViolation) duplicate key value violates unique constraint "tx_idempotency_key_key"
+
+And prev_tx_id to make a conditional request to the ledger to detect
+concurrency issues, when provided, this argument has similar semantic to HTTP
+If-Match request header when used with a verb that mutates a stateful resource:
+
+    In [12]: tx2 = create_debit_transaction(30)
+    Working on jim accounts. jim has 18 transaction(s).
+    Current balance: $145   Available balance: $85
+
+    In [13]: create_credit_transaction(30, prev_tx_id=tx2)
+    Working on jim accounts. jim has 19 transaction(s).
+    Current balance: $145   Available balance: $55
+    Out[13]: 'b15d91da8dd555bb0bbfce47cc39ee90019e033c0663c28eff678f27b68eb9ff'
+
+    In [14]: create_credit_transaction(20, prev_tx_id=tx2)
+    ERROR: (psycopg.errors.UniqueViolation) duplicate key value violates unique constraint "tx_prev_tx_id_key"
+
+
+
 ''' + CLEAR
 
 class _Usage:
@@ -66,10 +97,6 @@ Ledger CLI
 Connected to {ledger.engine.url}
 Type `usage` and press enter for help with the Ledger CLI.
 '''
-
-def create_account(name: str) -> accounting.AccountId:
-    return ledger.create_account(name)
-
 
 T = TypeVar('T', bound=Callable[..., Any])
 def catch_exception(wrapped: T) -> T:
@@ -99,6 +126,10 @@ def _validate_group_tx_id(group_tx_id_hex: str) -> accounting.TransactionId:
         return group_tx_id
 
 
+def create_account(name: str) -> accounting.AccountId:
+    return ledger.create_account(name)
+
+
 def activate_account(name: str) -> None:
     global active_account_id
     with ledger:
@@ -111,9 +142,15 @@ def activate_account(name: str) -> None:
 def _create_pending_transaction(amount: Decimal | float | int, **kwargs: Any) -> str:
     _must_have_active_account()
     amount = accounting.Money(Decimal(amount))
+    _validate_kwargs(kwargs)
     tx_id = ledger.create_pending_transaction(account_id=active_account_id, amount=amount, **kwargs)
     print_account_summmary()
     return tx_id.hex()
+
+
+def _validate_kwargs(kwargs):
+    if 'prev_tx_id' in kwargs:
+        kwargs["prev_tx_id"] = accounting.TransactionId(bytes.fromhex(kwargs["prev_tx_id"]))
 
 
 @catch_exception
@@ -130,6 +167,7 @@ def create_credit_transaction(amount: Decimal | float | int, **kwargs: Any) -> s
 def settle_transaction(group_tx_id_hex: str, **kwargs: Any) -> None:
     _must_have_active_account()
     group_tx_id = _validate_group_tx_id(group_tx_id_hex)
+    _validate_kwargs(kwargs)
     ledger.settle_transaction(group_tx_id, **kwargs)
     print_account_summmary()
 
@@ -139,6 +177,7 @@ def refund_transaction(group_tx_id_hex: str, amount: Decimal | float | int, **kw
     _must_have_active_account()
     amount = accounting.Money(Decimal(amount))
     group_tx_id = _validate_group_tx_id(group_tx_id_hex)
+    _validate_kwargs(kwargs)
     ledger.refund_pending_transaction(group_tx_id, amount)
     print_account_summmary()
 
