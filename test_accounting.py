@@ -78,6 +78,25 @@ def given_andy_account_balance_is_100(
 
 
 @fixture
+def given_andy_has_pending_debit_transaction(
+    ledger: accounting.Ledger,
+    andy: accounting.AccountId,
+    given_andy_account_balance_is_100: accounting.TransactionId,
+) -> accounting.TransactionId:
+    debit_tx_id = ledger.create_pending_transaction(
+        account_id=andy,
+        amount=Money(Decimal("30")),
+    )
+
+    with ledger:
+        settlement_tx = ledger.session.get(Tx, debit_tx_id)
+        assert settlement_tx is not None
+        assert settlement_tx.current_balance == Decimal(100)
+        assert settlement_tx.available_balance == Decimal(100)
+    return debit_tx_id
+
+
+@fixture
 def given_andy_has_pending_credit_transaction(
     ledger: accounting.Ledger,
     andy: accounting.AccountId,
@@ -485,36 +504,61 @@ def test_group_prev_tx_id_cannot_be_empty_except_for_pending_and_new_account_tra
             ledger.session.add(new_tx)
 
 
-def test_settle_transaction(
+def test_settle_transaction_debit(
     ledger: accounting.Ledger,
     andy: accounting.AccountId,
+    given_andy_has_pending_debit_transaction: accounting.TransactionId,
 ) -> None:
-    pending_tx_id = ledger.create_pending_transaction(
-        account_id=andy,
-        amount=Money(Decimal("30")),
-    )
-
     settlement_tx_id = ledger.settle_transaction(
-        group_tx_id=pending_tx_id,
+        group_tx_id=given_andy_has_pending_debit_transaction,
     )
 
     settlement_tx = ledger.session.get(Tx, settlement_tx_id)
     assert settlement_tx is not None
     assert is_sha256_bytes(settlement_tx.id)
     assert settlement_tx.account.id == andy
-    assert settlement_tx.group_tx_id == pending_tx_id
+    assert settlement_tx.group_tx_id == given_andy_has_pending_debit_transaction
     assert settlement_tx.type == TxType.SETTLEMENT
     assert settlement_tx.amount == Money(Decimal("30"))
     assert settlement_tx.pending_amount == Money(Decimal("30"))
     assert settlement_tx.group_prev_pending_amount == Money(Decimal("30"))
 
-    assert settlement_tx.prev_tx_id == pending_tx_id
+    assert settlement_tx.prev_tx_id == given_andy_has_pending_debit_transaction
     assert_tx_balances(
         settlement_tx,
-        prev_current_balance=Money(Decimal("0")),
-        prev_available_balance=Money(Decimal("0")),
-        current_balance=Money(Decimal("30")),
-        available_balance=Money(Decimal("30")),
+        prev_current_balance=Money(Decimal("100")),
+        prev_available_balance=Money(Decimal("100")),
+        current_balance=Money(Decimal("130")),
+        available_balance=Money(Decimal("130")),
+    )
+
+
+def test_settle_transaction_credit(
+    ledger: accounting.Ledger,
+    andy: accounting.AccountId,
+    given_andy_has_pending_credit_transaction: accounting.TransactionId,
+) -> None:
+    settlement_tx_id = ledger.settle_transaction(
+        group_tx_id=given_andy_has_pending_credit_transaction,
+    )
+
+    settlement_tx = ledger.session.get(Tx, settlement_tx_id)
+    assert settlement_tx is not None
+    assert is_sha256_bytes(settlement_tx.id)
+    assert settlement_tx.account.id == andy
+    assert settlement_tx.group_tx_id == given_andy_has_pending_credit_transaction
+    assert settlement_tx.type == TxType.SETTLEMENT
+    assert settlement_tx.amount == Money(Decimal("-30"))
+    assert settlement_tx.pending_amount == Money(Decimal("-30"))
+    assert settlement_tx.group_prev_pending_amount == Money(Decimal("-30"))
+
+    assert settlement_tx.prev_tx_id == given_andy_has_pending_credit_transaction
+    assert_tx_balances(
+        settlement_tx,
+        prev_current_balance=Money(Decimal("100")),
+        prev_available_balance=Money(Decimal("70")),
+        current_balance=Money(Decimal("70")),
+        available_balance=Money(Decimal("70")),
     )
 
 
