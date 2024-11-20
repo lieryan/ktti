@@ -29,6 +29,14 @@ Out[1]:
 <help text>
 ```
 
+## Tests
+
+To run the builtin test:
+
+```
+$ pytest
+```
+
 ## Design rationale
 
 1. Some ledgers designs records transaction status transitions in a separate

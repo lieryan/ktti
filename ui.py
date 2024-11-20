@@ -5,6 +5,7 @@ from functools import wraps
 import db
 from decimal import Decimal
 from sqlalchemy import select, func
+import sqlalchemy
 import IPython
 
 ledger = accounting.Ledger(db.connect())
@@ -220,4 +221,9 @@ active_account_id = None
 
 ip = IPython.terminal.embed.InteractiveShellEmbed()  # type: ignore[no-untyped-call]
 print(header)
+try:
+    create_database()
+except sqlalchemy.exc.OperationalError as e:
+    print(e)
+    print("You may need to run `docker compose up -d`")
 ip.mainloop()  # type: ignore[no-untyped-call]
