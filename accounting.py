@@ -108,7 +108,7 @@ class Ledger(AutocommitSessionTransaction):
                 amount=amount,
                 pending_amount=amount,
             )
-            obj._set_prev_tx(self.session.get(Tx, prev_tx_id))
+            self._add_to_account(obj, prev_tx_id)
             if obj.is_credit:
                 obj.available_balance += amount
             if obj.available_balance < 0:
@@ -140,7 +140,7 @@ class Ledger(AutocommitSessionTransaction):
                 account_id=group_tx.account_id,
                 type=TxType.SETTLEMENT,
             )
-            obj._set_prev_tx(self.session.get(Tx, prev_tx_id))
+            self._add_to_account(obj, prev_tx_id)
             self._add_to_group(obj, group_tx)
             group_latest_tx = self.get_latest_group_transaction(group_tx)
             settled_amount = group_latest_tx.pending_amount
@@ -180,7 +180,7 @@ class Ledger(AutocommitSessionTransaction):
                 type=TxType.REFUND,
                 amount=amount,
             )
-            obj._set_prev_tx(self.session.get(Tx, prev_tx_id))
+            self._add_to_account(obj, prev_tx_id)
             self._add_to_group(obj, group_tx)
             obj.pending_amount = obj.group_prev_pending_amount + amount
             obj.available_balance += amount
@@ -244,6 +244,16 @@ class Ledger(AutocommitSessionTransaction):
         if group_tx.type != TxType.PENDING:
             raise ValueError(f"Transaction {group_tx_id!r} is not a Group ID.")
         return group_tx
+
+    def _add_to_account(self, obj: Tx, prev_tx_id: TransactionId) -> None:
+        assert obj.id is None, "transaction should not be saved yet"
+        prev_tx = self.session.get(Tx, prev_tx_id)
+        assert prev_tx is not None
+        obj.prev_tx_id = prev_tx.id
+        obj.prev_current_balance = prev_tx.current_balance
+        obj.prev_available_balance = prev_tx.available_balance
+        obj.current_balance = prev_tx.current_balance
+        obj.available_balance = prev_tx.available_balance
 
     def _add_to_group(self, obj: Tx, group_tx: Tx) -> None:
         if group_tx.type != TxType.PENDING:

@@ -1,7 +1,7 @@
 from decimal import Decimal
 from enum import Enum
 from hashlib import sha256
-from typing import Optional, Self
+from typing import Optional
 from uuid import UUID, uuid4
 
 import sqlalchemy
@@ -206,15 +206,6 @@ class Tx(Base):
         remote_side=[id],
         foreign_keys=[prev_tx_id, account_id],
     )
-
-    def _set_prev_tx(self, prev_tx: Self) -> None:
-        assert self.id is None
-
-        self.prev_tx_id = prev_tx.id
-        self.prev_current_balance = prev_tx.current_balance
-        self.prev_available_balance = prev_tx.available_balance
-        self.current_balance = prev_tx.current_balance
-        self.available_balance = prev_tx.available_balance
 
     def _set_transaction_hash(self) -> None:
         assert self.id is None
