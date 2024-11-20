@@ -202,8 +202,15 @@ def print_account_summmary() -> None:
 def print_transactions() -> None:
     _must_have_active_account()
     with ledger:
+        account = ledger.session.get(db.Account, active_account_id)
+        assert account is not None
+        print(f"{account.name}'s transactions")
+        print(f"{'Group Id':>64}:{'Tx Hash':64} | {'Type':12} |    Amount ( Pending ) | Cur. Balance | Av. Balance ")
+        print(f"-"*197)
         for tx in ledger.list_transactions(account_id=active_account_id):
-            print(tx)
+            group_tx = (tx.group_tx_id or b"").hex()
+            tx_hash = tx.tx_hash.hex()
+            print(f"{group_tx:64}:{tx_hash} | {tx.type.name:12} | ${tx.amount:8} (${tx.pending_amount:8}) | ${tx.current_balance:11} | ${tx.available_balance:10}")
 
 
 def create_database() -> None:

@@ -312,11 +312,3 @@ class Ledger(AutocommitSessionTransaction):
         tx = self.session.get(Tx, latest_tx)
         assert tx is not None
         return tx
-
-    ### UI
-
-    def print_transactions(
-        self,
-        account_id: AccountId,
-    ) -> None:
-        pass
