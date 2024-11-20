@@ -27,8 +27,8 @@ def ledger(engine: sqlalchemy.Engine) -> accounting.Ledger:
 @fixture(autouse=True)
 def db(engine: sqlalchemy.Engine) -> sqlalchemy.Engine:
     """Re-initialize the database"""
-    create_tables(engine)
     with engine.begin() as conn:
+        create_tables(conn)
         conn.execute(text("DELETE FROM tx"))
         conn.execute(text("DELETE FROM account"))
         conn.commit()
