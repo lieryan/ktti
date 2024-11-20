@@ -45,8 +45,7 @@ def get_new_account_id_query(account_id: accounting.AccountId) -> sqlalchemy.Sel
 
 @fixture
 def andy(ledger):  # type: ignore[no-untyped-def]
-    andy, prev_tx_id = ledger.create_account("andy")
-    return andy
+    return ledger.create_account("andy")
 
 
 @fixture
@@ -138,8 +137,7 @@ def given_andy_has_settled_credit_transaction(
 
 @fixture
 def bill(ledger):  # type: ignore[no-untyped-def]
-    bill, prev_tx_id = ledger.create_account("bill")
-    return bill
+    return ledger.create_account("bill")
 
 
 @contextmanager
@@ -172,7 +170,7 @@ def assert_tx_balances(
 def test_create_account(
     ledger: accounting.Ledger,
 ) -> None:
-    charlie, new_account_tx_id = ledger.create_account("charlie")
+    charlie = ledger.create_account("charlie")
 
     account = ledger.session.execute(select(Account)).scalar_one()
     assert isinstance(account.id, UUID)
@@ -197,7 +195,7 @@ def test_create_account(
 def test_cannot_create_two_accounts_with_the_same_name(
     ledger: accounting.Ledger,
 ) -> None:
-    david, new_account_tx_id = ledger.create_account("david")
+    david = ledger.create_account("david")
     with assert_does_not_create_any_new_tx(ledger), \
             raises(
                 sqlalchemy.exc.IntegrityError,
@@ -209,7 +207,7 @@ def test_cannot_create_two_accounts_with_the_same_name(
 def test_cannot_create_new_account_transaction_for_the_same_account(
     ledger: accounting.Ledger,
 ) -> None:
-    charlie, new_account_tx_id = ledger.create_account("charlie")
+    charlie = ledger.create_account("charlie")
     with assert_does_not_create_any_new_tx(ledger), \
             raises(
                 sqlalchemy.exc.IntegrityError,

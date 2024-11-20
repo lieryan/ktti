@@ -62,7 +62,7 @@ class Ledger(AutocommitSessionTransaction):
         name: str,
         *,
         idempotency_key: Optional[UUID] = None,
-    ) -> tuple[AccountId, TransactionId]:
+    ) -> AccountId:
         idempotency_key = self._ensure_idempotency_key(idempotency_key)
         with self:
             obj = Account(name=name)
@@ -88,7 +88,7 @@ class Ledger(AutocommitSessionTransaction):
             new_account_tx._set_transaction_hash()
             self.session.add(new_account_tx)
 
-            return AccountId(obj.id), TransactionId(new_account_tx.id)
+            return AccountId(obj.id)
 
     def create_pending_transaction(
         self,
