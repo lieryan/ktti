@@ -27,43 +27,45 @@
    way to model debit and credit in a ledger, but it's good enough for this
    purpose.
 
-3. Money type with Decimal. In production application, I'd have used a Money
-   class to handle currencies explicitly in the system.
-
-4. The exercise does not require cryptographic tamperproofing of the
+3. The exercise prompt does not require cryptographic tamperproofing of the
    transaction log, but I thought it'd be of interest to implement this anyway
    due to our discussion.
 
-5. Use of requirements.txt. Not the most modern practice, I would have used
-   poetry for actual projects, but it's simplest for the purpose of this
-   assignment.
+4. It's a bit of a strange requirement from the prompt to require that refund
+   is intended to work on a pending transaction instead of settled. Normally,
+   pending transaction is meant for payments in the middle of processing; and
+   you only want to refund payments after the initial processing have finished
+   (e.g. a couple months after a purchase, a customer demanded a warranty
+   refund). If you want to change payments while the process pending payment
+   processing has not completed, you'd it'd have made more sense to just cancel
+   the pending payment and make a new payment session instead of keeping the
+   payment pending for months in case a customer want a refund.
 
-6. It's a bit of a strange requirement from the prompt to require that refund
-   is intended to work on a pending transaction. Normally, pending transaction
-   is meant for payments in the middle of processing; and you only want to
-   refund payments after the initial processing have finished (e.g. a couple
-   months after a purchase, a customer demanded a warranty refund). If you want
-   to change payments while the process pending payment processing has not
-   completed, you'd it'd have made more sense to just cancel the pending
-   payment and make a new payment session instead of keeping the payment
-   pending for months in case a customer want a refund.
+5. To protect against double spending, Tx.idempotency_key is used to detect
+   duplicate/repeated transactions if the sender retried a request with
+   identical idempotency key, they are considered the same transaction. I don't
+   have the time to implement this mechanism fully, but the intent here is that
+   when there's unique constraint violation on idempotency_key, the ledger
+   should not insert new Tx but just returned a response as if it actually did.
+   A more sophisticated implementation might even detect when the repeat
+   request doesn't come with the same data as the original request and raise
+   that as a different error to the client.
 
-6. Tx.idempotency_key is used to detect duplicate/repeated transactions if the
-   sender retried a request with identical idempotency key, they are considered
-   the same transaction. I don't have the time to implement this mechanism
-   fully, but the intent here is that when there's unique constraint violation
-   on idempotency_key, the ledger should not insert new Tx but just returned a
-   response as if it actually did. A more sophisticated implementation might
-   even detect when the repeat request doesn't come with the same data as the
-   original request and raise that as a different error to the client.
-
-7. The ledger supports optional optimistic locking with prev_tx_id. The client
+6. The ledger supports optional optimistic locking with prev_tx_id. The client
    can pass the ID of the last transaction it knew about to ensure that the
    request is only processed if there wasn't any other concurrent transactions.
 
-8. In production scenario, you would have wanted to version tx_hash so that you
+7. In production scenario, you would have wanted to version tx_hash so that you
    can still verify hashes of old transactions if their calculation logic
    changes.
+
+8. Money type with Decimal. In production application, I'd have used a Money
+   class that can handle currencies explicitly in the system. But the current
+   implementation does not support dealing with currencies in any way.
+
+9. Use of requirements.txt. Not the most modern practice, I would have used
+   poetry for actual projects, but it's simplest for the purpose of this
+   assignment.
 
 
 ## Caveats
