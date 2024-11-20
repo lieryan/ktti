@@ -15,7 +15,7 @@ from db import create_tables, Account, Tx, TxType
 @fixture
 def engine() -> sqlalchemy.Engine:
     return create_engine(
-        "postgresql+psycopg://postgres:password@localhost:5432/postgres"
+        "postgresql+psycopg://postgres:password@localhost:5433/postgres"
     )
 
 

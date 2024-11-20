@@ -253,8 +253,8 @@ class Tx(Base):
         return f"<Tx {group_tx_short}:{tx_hash_short} {tx_type} account={account_name} amount={self.amount} pending_amount={self.pending_amount} balances={self.current_balance},{self.available_balance},{self.prev_current_balance},{self.prev_available_balance}>"
 
 
-def connect():
-    return create_engine("")
+def connect() -> sqlalchemy.Engine:
+    return create_engine("postgresql+psycopg://postgres:password@localhost:5432/postgres")
 
 
 def create_tables(conn: sqlalchemy.Connection) -> None:
