@@ -309,8 +309,7 @@ def test_create_pending_transaction_credit_insufficient_fund(
 ) -> None:
     with assert_does_not_create_any_new_tx(ledger), \
             raises(
-                sqlalchemy.exc.IntegrityError,
-                match='violates check constraint "tx_positive_available_balance"',
+                accounting.Ledger.InsufficientFund,
             ):
         pending_tx = ledger.create_pending_transaction(
             account_id=andy,

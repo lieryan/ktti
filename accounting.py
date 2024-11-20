@@ -54,6 +54,9 @@ class AutocommitSessionTransaction:
 
 
 class Ledger(AutocommitSessionTransaction):
+    class InsufficientFund(Exception):
+        pass
+
     def create_account(
         self,
         name: str,
@@ -108,6 +111,8 @@ class Ledger(AutocommitSessionTransaction):
             obj._set_prev_tx(self.session.get(Tx, prev_tx_id))
             if obj.is_credit:
                 obj.available_balance += amount
+            if obj.available_balance < 0:
+                raise Ledger.InsufficientFund()
             obj._set_transaction_hash()
             obj._set_group_tx_root()
 
