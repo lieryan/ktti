@@ -246,6 +246,16 @@ class Ledger(AutocommitSessionTransaction):
         return group_tx
 
     def _add_to_account(self, obj: Tx, prev_tx_id: TransactionId) -> None:
+        """
+        Append the transaction `obj` to its account's event log.
+
+        `prev_tx_id` is an optimistic locking key. If provided, the append will
+        fail if `prev_tx_id` wasn't the last transaction of that account. This
+        can be used by clients to ensure that no other concurrent transactions
+        have happened during the call. If `prev_tx_id` is not provided, there
+        is no concurrency protection and the append will never fail due to
+        sequencing issues.
+        """
         assert obj.id is None, "transaction should not be saved yet"
         prev_tx = self.session.get(Tx, prev_tx_id)
         assert prev_tx is not None
@@ -256,6 +266,9 @@ class Ledger(AutocommitSessionTransaction):
         obj.available_balance = prev_tx.available_balance
 
     def _add_to_group(self, obj: Tx, group_tx: Tx) -> None:
+        """
+        Append the transaction `obj` to its transaction group's event log.
+        """
         if group_tx.type != TxType.PENDING:
             raise ValueError("group_tx must be the pending transaction of the group")
 
