@@ -875,6 +875,7 @@ def test_list_transactions(
 def test_get_latest_transaction(
     ledger: accounting.Ledger,
     andy: accounting.AccountId,
+    bill: accounting.AccountId,
 ) -> None:
     tx1 = ledger.create_pending_transaction(
         account_id=andy,
@@ -893,6 +894,12 @@ def test_get_latest_transaction(
     tx4 = ledger.create_pending_transaction(
         account_id=andy,
         amount=Money(Decimal("50")),
+    )
+
+    # tx of a different user
+    tx5 = ledger.create_pending_transaction(
+            account_id=bill,
+            amount=Money(Decimal("100")),
     )
 
     latest_tx = ledger.get_latest_transaction(andy)
