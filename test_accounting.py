@@ -172,15 +172,15 @@ def assert_tx_balances(
 def test_create_account(
     ledger: accounting.Ledger,
 ) -> None:
-    andy, new_account_tx_id = ledger.create_account("andy")
+    charlie, new_account_tx_id = ledger.create_account("charlie")
 
     account = ledger.session.execute(select(Account)).scalar_one()
     assert isinstance(account.id, UUID)
-    assert account.name == "andy"
+    assert account.name == "charlie"
 
     new_account_tx = ledger.session.execute(select(Tx)).scalar_one()
     assert is_sha256_bytes(new_account_tx.id)
-    assert new_account_tx.account_id == andy
+    assert new_account_tx.account_id == charlie
     assert new_account_tx.type == TxType.NEW_ACCOUNT
     assert new_account_tx.amount == Money(Decimal(0))
     assert new_account_tx.pending_amount == Money(Decimal(0))
@@ -197,19 +197,19 @@ def test_create_account(
 def test_cannot_create_two_accounts_with_the_same_name(
     ledger: accounting.Ledger,
 ) -> None:
-    andy, new_account_tx_id = ledger.create_account("andy")
+    david, new_account_tx_id = ledger.create_account("david")
     with assert_does_not_create_any_new_tx(ledger), \
             raises(
                 sqlalchemy.exc.IntegrityError,
-                match="Key \\(name\\)=\\(andy\\) already exists.",
+                match="Key \\(name\\)=\\(david\\) already exists.",
             ) as e:
-        ledger.create_account("andy")
+        ledger.create_account("david")
 
 
 def test_cannot_create_new_account_transaction_for_the_same_account(
     ledger: accounting.Ledger,
 ) -> None:
-    andy, new_account_tx_id = ledger.create_account("andy")
+    charlie, new_account_tx_id = ledger.create_account("charlie")
     with assert_does_not_create_any_new_tx(ledger), \
             raises(
                 sqlalchemy.exc.IntegrityError,
@@ -218,7 +218,7 @@ def test_cannot_create_new_account_transaction_for_the_same_account(
         with ledger:
             new_account_tx = Tx(
                 idempotency_key=uuid4(),
-                account_id=andy,
+                account_id=charlie,
                 type=TxType.NEW_ACCOUNT,
                 amount=Money(Decimal(0)),
                 pending_amount=Money(Decimal(0)),
