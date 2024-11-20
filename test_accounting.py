@@ -39,20 +39,23 @@ def is_sha256_bytes(value: Any) -> bool:
     return isinstance(value, bytes) and len(value) == 32
 
 
+def get_new_account_id_query(account_id: accounting.AccountId) -> sqlalchemy.Select[tuple[bytes]]:
+    return select(Tx.id).where(Tx.account_id == account_id, Tx.type == TxType.NEW_ACCOUNT)
+
+
 @fixture
-def _andy(ledger):  # type: ignore[no-untyped-def]
+def andy(ledger):  # type: ignore[no-untyped-def]
     andy, prev_tx_id = ledger.create_account("andy")
-    return andy, prev_tx_id
+    return andy
 
 
 @fixture
-def andy(_andy) -> accounting.AccountId:  # type: ignore[no-untyped-def]
-    return _andy[0]  # type: ignore[no-any-return]
-
-
-@fixture
-def andy_new_account_tx_id(_andy) -> accounting.TransactionId:  # type: ignore[no-untyped-def]
-    return _andy[1]  # type: ignore[no-any-return]
+def andy_new_account_tx_id(
+    ledger: accounting.Ledger,
+    andy: accounting.AccountId,
+) -> accounting.TransactionId:
+    with ledger:
+        return accounting.TransactionId(ledger.session.execute(get_new_account_id_query(andy)).scalar_one())
 
 
 @fixture
@@ -134,19 +137,9 @@ def given_andy_has_settled_credit_transaction(
 
 
 @fixture
-def _bill(ledger):  # type: ignore[no-untyped-def]
+def bill(ledger):  # type: ignore[no-untyped-def]
     bill, prev_tx_id = ledger.create_account("bill")
-    return bill, prev_tx_id
-
-
-@fixture
-def bill(_bill) -> accounting.AccountId:  # type: ignore[no-untyped-def]
-    return _bill[0]  # type: ignore[no-any-return]
-
-
-@fixture
-def bill_new_account_tx_id(_bill) -> accounting.TransactionId:  # type: ignore[no-untyped-def]
-    return _bill[1]  # type: ignore[no-any-return]
+    return bill
 
 
 @contextmanager
