@@ -15,7 +15,18 @@
 ## Usage
 
 ```
+$ docker compose up -d
 $ python ui.py
+Ledger CLI
+
+Connected to postgresql+psycopg://postgres:***@localhost:5432/postgres
+Type `usage` and press enter for help with the Ledger CLI.
+
+
+In [1]: usage
+Out[1]: 
+
+<help text>
 ```
 
 ## Design rationale
@@ -56,19 +67,23 @@ $ python ui.py
    request doesn't come with the same data as the original request and raise
    that as a different error to the client.
 
-6. The ledger supports optional optimistic locking with prev_tx_id. The client
+6. To protect against overspending, there is a check constraint enforced by the
+   database. We could also have added a nicer UI to display this in a nicer way
+   in the CLI instead of just displaying the raw database error.
+
+7. The ledger supports optional optimistic locking with prev_tx_id. The client
    can pass the ID of the last transaction it knew about to ensure that the
    request is only processed if there wasn't any other concurrent transactions.
 
-7. In production scenario, you would have wanted to version tx_hash so that you
+8. In production scenario, you would have wanted to version tx_hash so that you
    can still verify hashes of old transactions if their calculation logic
    changes.
 
-8. Money type with Decimal. In production application, I'd have used a Money
+9. Money type with Decimal. In production application, I'd have used a Money
    class that can handle currencies explicitly in the system. But the current
    implementation does not support dealing with currencies in any way.
 
-9. Use of requirements.txt. Not the most modern practice, I would have used
+10. Use of requirements.txt. Not the most modern practice, I would have used
    poetry for actual projects, but it's simplest for the purpose of this
    assignment.
 
