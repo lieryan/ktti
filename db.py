@@ -125,6 +125,8 @@ class Tx(Base):
 
         # don't allow more than one one NEW_ACCOUNT transaction for each Account
         Index("tx_only_one_new_account_tx_per_account_id", "account_id", unique=True, postgresql_where="type = 'NEW_ACCOUNT'"),
+        # don't allow more than one one SETTLEMENT transaction for each PENDING transaction
+        Index("tx_only_one_settlement_per_pending", "group_tx_id", unique=True, postgresql_where="type = 'SETTLEMENT'"),
 
         # only NEW_ACCOUNT transaction can have empty prev_tx_id
         CheckConstraint("type = 'NEW_ACCOUNT' OR prev_tx_id IS NOT NULL", name="tx_require_prev_tx_id"),
